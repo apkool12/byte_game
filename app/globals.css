@@ -68,3 +68,12 @@ a {
   color: inherit;
   text-decoration: none;
 }
+
+/* 하이드레이션 전 깜빡임 방지: 초기에는 숨김, 마운트 후 표시 */
+.hide-until-hydrated {
+  opacity: 0;
+}
+.hide-until-hydrated.mounted {
+  opacity: 1;
+  transition: opacity 0.2s ease-out;
+}
