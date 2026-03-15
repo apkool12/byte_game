@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { keyframes } from "@emotion/react";
 import styled from "@emotion/styled";
 import DecoRing from "../login/components/DecoRing";
+import UserHomeHeader from "./components/UserHomeHeader";
 
 const entranceFadeIn = keyframes`
   from { opacity: 0; }
@@ -69,6 +70,7 @@ export default function UserHomePage() {
           minHeight: "100dvh",
         }}
       >
+        <UserHomeHeader />
         <TextureOverlay>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/background_effect.png" alt="" />
