@@ -5,6 +5,10 @@ import { keyframes } from "@emotion/react";
 import styled from "@emotion/styled";
 import DecoRing from "../login/components/DecoRing";
 import LetterModal from "./components/LetterModal";
+import ShopModal from "./components/ShopModal";
+import GameClock from "./components/GameClock";
+import ScoreCard from "./components/ScoreCard";
+import ShopCard from "./components/ShopCard";
 
 const entranceFadeIn = keyframes`
   from { opacity: 0; }
@@ -115,6 +119,35 @@ const UnreadBadge = styled.span`
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 `;
 
+const ClockSection = styled.section`
+  position: absolute;
+  left: 30%;
+  top: 5%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  animation: ${entranceFadeIn} 0.6s ease-out both;
+`;
+
+const ScoreShopSection = styled.section`
+  position: absolute;
+  left: -24px;
+  right: -24px;
+  bottom: 294px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  animation: ${entranceFadeIn} 0.6s ease-out 0.2s both;
+`;
+
+const ScoreCardWrap = styled.div`
+  transform: translateY(12px);
+`;
+
+const ShopCardWrap = styled.div`
+  transform: translateY(12px);
+`;
+
 /** true면 메인에 게임 편지 + 안 읽음 1 표시 */
 const HAS_UNREAD_LETTER = true;
 
@@ -129,6 +162,7 @@ export default function MainPage() {
   const [mounted, setMounted] = useState(false);
   const [letterModalOpen, setLetterModalOpen] = useState(false);
   const [letterDismissed, setLetterDismissed] = useState(false);
+  const [shopModalOpen, setShopModalOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -152,6 +186,10 @@ export default function MainPage() {
         onClose={handleCloseLetter}
         userName="우은식"
         userNo="027"
+      />
+      <ShopModal
+        open={shopModalOpen}
+        onClose={() => setShopModalOpen(false)}
       />
       <div
         className={`hide-until-hydrated ${mounted ? "mounted" : ""}`}
@@ -182,6 +220,21 @@ export default function MainPage() {
             </LetterIcon>
             <LetterCaption>편지가 도착했습니다</LetterCaption>
           </LetterBlock>
+        )}
+        {letterDismissed && (
+          <>
+            <ClockSection aria-label="현재 시각">
+              <GameClock />
+            </ClockSection>
+            <ScoreShopSection aria-label="점수 및 상점">
+              <ScoreCardWrap>
+                <ScoreCard score={1000} />
+              </ScoreCardWrap>
+              <ShopCardWrap>
+                <ShopCard onClick={() => setShopModalOpen(true)} />
+              </ShopCardWrap>
+            </ScoreShopSection>
+          </>
         )}
       </div>
     </Page>
