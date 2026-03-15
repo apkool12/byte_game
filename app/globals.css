@@ -25,20 +25,27 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+@supports (-webkit-appearance: none) and (stroke-color: transparent) {
+  html,
+  body {
+    min-height: -webkit-fill-available;
+  }
+}
+
 body {
   position: relative;
   /* 위 흰색 방지 */
   background: #1e1e1e;
 }
 
-/* 하단(검색창·safe area) 흰색 방지 — 그라데이션 끝색 */
+/* 하단(주소창·검색창·safe area)까지 배경 — 그라데이션 끝색 */
 body::after {
   content: "";
   position: fixed;
   left: 0;
   right: 0;
   bottom: 0;
-  height: max(env(safe-area-inset-bottom, 0px), 120px);
+  height: max(env(safe-area-inset-bottom, 0px), 220px);
   background: #1f0707;
   z-index: -1;
   pointer-events: none;
