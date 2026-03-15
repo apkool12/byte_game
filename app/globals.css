@@ -26,7 +26,22 @@ body {
 }
 
 body {
-  background: #0a0a0a;
+  position: relative;
+  /* 위 흰색 방지 */
+  background: #1e1e1e;
+}
+
+/* 하단(검색창·safe area) 흰색 방지 — 그라데이션 끝색 */
+body::after {
+  content: "";
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: max(env(safe-area-inset-bottom, 0px), 120px);
+  background: #1f0707;
+  z-index: -1;
+  pointer-events: none;
 }
 
 a {
