@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { keyframes } from "@emotion/react";
 import styled from "@emotion/styled";
 import InputForm, { type LoginFormValues } from "./components/InputForm";
 import ActionButton from "./components/ActionButton";
@@ -10,6 +11,20 @@ import ByteGameLogo from "./components/ByteGameLogo";
 
 /** true면 메인 폼(입력·버튼) 표시, false면 배경·링·로고만 */
 const SHOW_UI_COMPONENTS = true;
+
+/* 입장 애니메이션 */
+const entranceFadeIn = keyframes`
+  from { opacity: 0; }
+  to { opacity: 1; }
+`;
+const entranceReveal = keyframes`
+  from { opacity: 0; transform: scale(0.94); }
+  to { opacity: 1; transform: scale(1); }
+`;
+const entranceSlideUp = keyframes`
+  from { opacity: 0; transform: translateY(-30px) translateY(24px); }
+  to { opacity: 1; transform: translateY(-30px) translateY(0); }
+`;
 
 const Page = styled.main`
   position: relative;
@@ -36,6 +51,14 @@ const TextureOverlay = styled.div`
   opacity: 0.05;
   pointer-events: none;
   z-index: 0;
+`;
+
+/** 배경 영역 입장 애니메이션 */
+const EntranceBg = styled.div`
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  animation: ${entranceFadeIn} 1.4s ease-out forwards;
 `;
 
 const MainForm = styled.div`
@@ -126,6 +149,7 @@ const FormWrap = styled.div<{
   margin-top: ${({ $marginTop }) => toLength($marginTop)};
   margin-bottom: ${({ $marginBottom }) => toLength($marginBottom)};
   transform: translateY(-30px);
+  animation: ${entranceSlideUp} 1.1s ease-out 0.9s both;
 `;
 
 const CenterRingWrap = styled.div`
@@ -138,13 +162,19 @@ const CenterRingWrap = styled.div`
   justify-content: center;
   gap: 24px;
   width: 100%;
+  animation: ${entranceReveal} 1.3s ease-out 0.4s both;
 `;
 
 export default function LoginPage() {
+  const [mounted, setMounted] = useState(false);
   const [form, setForm] = useState<LoginFormValues>({
     name: "",
     inviteCode: "",
   });
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleSubmit = useCallback(() => {
     // TODO: socket 또는 API 연동
@@ -153,11 +183,24 @@ export default function LoginPage() {
 
   return (
     <Page>
-      <BackgroundTriangle
-        transform="translate(0, -210px) scale(1)"
-        opacity={0.9}
-      />
-      <TextureOverlay />
+      <div
+        className={`hide-until-hydrated ${mounted ? "mounted" : ""}`}
+        style={{
+          minHeight: "100%",
+          width: "100%",
+          position: "relative",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+        }}
+      >
+      <EntranceBg>
+        <BackgroundTriangle
+          transform="translate(0, -210px) scale(1)"
+          opacity={0.9}
+        />
+        <TextureOverlay />
+      </EntranceBg>
       <CenterRingWrap>
         <DecoRing transform="translate(150px, -10px) scale(1.5)" />
         <ByteGameLogo
@@ -177,6 +220,7 @@ export default function LoginPage() {
           <ActionButton onClick={handleSubmit}>SURE</ActionButton>
         </MainForm>
       </FormWrap>
+      </div>
     </Page>
   );
 }

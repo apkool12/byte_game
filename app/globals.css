@@ -1,5 +1,7 @@
-/* Pretendard Light (placeholder 등) */
-@import url("https://cdn.jsdelivr.net/npm/@fontsource/pretendard@5.2.5/300.css");
+/* Pretendard (전체 굵기 한 번에 로드 — Light 300, Black 900 구분용) */
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css");
+/* 궁서체 느낌 한글 세리프 (구운바탕) */
+@import url("https://fonts.googleapis.com/css2?family=Gowun+Batang&display=swap");
 
 * {
   box-sizing: border-box;
@@ -15,6 +17,40 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: "HealthsetGothicLight";
+  src: url("/fonts/Healthset%20Gothic%20Light.otf") format("opentype");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "YeotnalSajingwan";
+  src: url("/fonts/a%EC%98%9B%EB%82%A0%EC%82%AC%EC%A7%84%EA%B4%802.ttf")
+    format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "YeotnalSajingwan5";
+  src: url("/fonts/a%EC%98%9B%EB%82%A0%EC%82%AC%EC%A7%84%EA%B4%805.ttf")
+    format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Krafton";
+  src: url("/fonts/KRAFTON_FONT.otf") format("opentype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* Safe area 제거: inset 0으로 고정 */
 :root {
   --safe-area-inset-top: 0px;
@@ -22,7 +58,15 @@
   --safe-area-inset-bottom: 0px;
   --safe-area-inset-left: 0px;
   --font-game-of-squids: "GameOfSquids", sans-serif;
+  --font-healthset-gothic-light: "HealthsetGothicLight", sans-serif;
+  --font-yeotnal-sajingwan: "YeotnalSajingwan", serif;
+  --font-yeotnal-sajingwan5: "YeotnalSajingwan5", serif;
+  /* Pretendard: 변수와 함께 font-weight 필수 — Light 300, Black 900 */
   --font-pretendard-light: "Pretendard", sans-serif;
+  --font-pretendard-black: "Pretendard", sans-serif;
+  /* 궁서체 느낌: 구운바탕 웹폰트 (한글 세리프) */
+  --font-gungsuh: "Gowun Batang", "궁서", "Gungsuh", "Batang", serif;
+  --font-krafton: "Krafton", sans-serif;
 }
 
 html,
@@ -67,4 +111,13 @@ body::after {
 a {
   color: inherit;
   text-decoration: none;
+}
+
+/* 하이드레이션 전 깜빡임 방지: 초기에는 숨김, 마운트 후 표시 */
+.hide-until-hydrated {
+  opacity: 0;
+}
+.hide-until-hydrated.mounted {
+  opacity: 1;
+  transition: opacity 0.2s ease-out;
 }

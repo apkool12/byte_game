@@ -1,0 +1,328 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import styled from "@emotion/styled";
+import { keyframes } from "@emotion/react";
+import { type ShopItemData, pickRandomShopItems } from "./shopItems";
+
+const letterUnfold = keyframes`
+  from {
+    opacity: 0;
+    transform: perspective(600px) rotateX(-18deg) translateY(20px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: perspective(600px) rotateX(0deg) translateY(0) scale(1);
+  }
+`;
+
+const letterFold = keyframes`
+  from {
+    opacity: 1;
+    transform: perspective(600px) rotateX(0deg) translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: perspective(600px) rotateX(-18deg) translateY(20px) scale(0.94);
+  }
+`;
+
+const contentFadeIn = keyframes`
+  from { opacity: 0; }
+  to { opacity: 1; }
+`;
+
+const Box = styled.div<{ $isClosing?: boolean }>`
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #1a1919 0%, #0d0d0d 100%);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  border: 1px solid rgba(227, 122, 123, 0.35);
+  border-top: none;
+  animation: ${({ $isClosing }) => ($isClosing ? letterFold : letterUnfold)}
+    0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  transform-origin: center top;
+`;
+
+const TopBar = styled.div`
+  height: 10px;
+  background: linear-gradient(90deg, #f5376a 0%, #ff61a6 100%);
+`;
+
+const BoxInner = styled.div`
+  padding: 20px 20px 28px;
+  animation: ${contentFadeIn} 0.4s ease-out 0.2s both;
+`;
+
+const CloseBtn = styled.button`
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: #fff;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 2;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+`;
+
+const LogoWrap = styled.div`
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+
+  img {
+    width: 140px;
+    height: auto;
+    display: block;
+  }
+`;
+
+const ItemList = styled.ul`
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+`;
+
+const ItemRow = styled.li`
+  display: flex;
+  align-items: center;
+  gap: 0;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+  &:active {
+    opacity: 0.9;
+  }
+`;
+
+const IconCircleOuter = styled.div`
+  flex-shrink: 0;
+  padding: 18px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #fff 0%, #510000 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+  position: relative;
+`;
+
+const IconCircle = styled.div`
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #fff 0%, #f0f0f0 100%);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+`;
+
+const IconWrap = styled.span`
+  position: relative;
+  z-index: 1;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #1a1919;
+`;
+
+const ItemStrip = styled.div`
+  flex: 1;
+  min-width: 0;
+  margin-left: -28px;
+  padding: 6px 14px 6px 36px;
+  border-radius: 0 50px 0 0;
+  background: linear-gradient(90deg, #f33e6c 0%, #6c001c 100%);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  position: relative;
+  z-index: 0;
+`;
+
+const ItemName = styled.span`
+  color: #fff;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
+  font-family: var(--font-yeotnal-sajingwan5), serif;
+  font-size: 23px;
+  font-style: normal;
+  font-weight: normal;
+  line-height: 132%;
+  letter-spacing: -0.5px;
+`;
+
+const ItemPrice = styled.span`
+  color: rgba(255, 255, 255, 0.52);
+
+  font-family: var(--font-krafton), sans-serif;
+  font-size: 18px;
+  font-weight: normal;
+  line-height: 132%;
+  letter-spacing: -0.5px;
+  opacity: 0.95;
+`;
+
+const ConfirmOverlay = styled.div`
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  border-radius: inherit;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+`;
+
+const ConfirmBox = styled.div`
+  background: linear-gradient(180deg, #1a1919 0%, #0d0d0d 100%);
+  border: 1px solid rgba(227, 122, 123, 0.35);
+  border-radius: 12px;
+  padding: 24px;
+  width: 100%;
+  max-width: 260px;
+  text-align: center;
+`;
+
+const ConfirmMessage = styled.p`
+  margin: 0 0 20px;
+  color: #fff;
+  font-family: var(--font-yeotnal-sajingwan5), serif;
+  font-size: 18px;
+  line-height: 1.5;
+`;
+
+const ConfirmPrice = styled.span`
+  display: block;
+  margin-top: 4px;
+  color: rgba(255, 255, 255, 0.7);
+  font-family: var(--font-krafton), sans-serif;
+  font-size: 16px;
+`;
+
+const ConfirmButtons = styled.div`
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+`;
+
+const ConfirmBtn = styled.button<{ $primary?: boolean }>`
+  flex: 1;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 8px;
+  font-family: var(--font-pretendard-black), sans-serif;
+  font-size: 15px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+  &:active {
+    opacity: 0.9;
+  }
+  ${({ $primary }) =>
+    $primary
+      ? `
+    background: linear-gradient(90deg, #f5376a 0%, #ff61a6 100%);
+    color: #fff;
+  `
+      : `
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+  `}
+`;
+
+export type { ShopItemData } from "./shopItems";
+
+export interface ShopModalCardProps {
+  isClosing?: boolean;
+  onClose: () => void;
+  /** 미전달 시 화장실 고정 + 나머지 2개 랜덤 */
+  items?: ShopItemData[];
+}
+
+export default function ShopModalCard({
+  isClosing = false,
+  onClose,
+  items: itemsProp,
+}: ShopModalCardProps) {
+  const items = useMemo(() => itemsProp ?? pickRandomShopItems(), [itemsProp]);
+  const [confirmingItem, setConfirmingItem] = useState<ShopItemData | null>(null);
+
+  return (
+    <Box $isClosing={isClosing} onClick={(e) => e.stopPropagation()}>
+      <TopBar />
+      <CloseBtn type="button" onClick={onClose} aria-label="닫기">
+        ✕
+      </CloseBtn>
+      <BoxInner>
+        <LogoWrap>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/byte_game_logo.svg" alt="" />
+        </LogoWrap>
+        <ItemList>
+          {items.map((item) => (
+            <ItemRow
+              key={item.id}
+              onClick={() => setConfirmingItem(item)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => e.key === "Enter" && setConfirmingItem(item)}
+            >
+              <IconCircleOuter>
+                <IconCircle>
+                  <IconWrap>{item.icon}</IconWrap>
+                </IconCircle>
+              </IconCircleOuter>
+              <ItemStrip>
+                <ItemName>{item.name}</ItemName>
+                <ItemPrice>{item.price}P</ItemPrice>
+              </ItemStrip>
+            </ItemRow>
+          ))}
+        </ItemList>
+      </BoxInner>
+      {confirmingItem && (
+        <ConfirmOverlay onClick={(e) => e.stopPropagation()}>
+          <ConfirmBox onClick={(e) => e.stopPropagation()}>
+            <ConfirmMessage>
+              {confirmingItem.name}
+              <ConfirmPrice>{confirmingItem.price}P 구매하시겠습니까?</ConfirmPrice>
+            </ConfirmMessage>
+            <ConfirmButtons>
+              <ConfirmBtn type="button" onClick={() => setConfirmingItem(null)}>
+                취소
+              </ConfirmBtn>
+              <ConfirmBtn
+                $primary
+                type="button"
+                onClick={() => {
+                  setConfirmingItem(null);
+                  onClose();
+                }}
+              >
+                확인
+              </ConfirmBtn>
+            </ConfirmButtons>
+          </ConfirmBox>
+        </ConfirmOverlay>
+      )}
+    </Box>
+  );
+}
