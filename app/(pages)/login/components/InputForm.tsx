@@ -1,38 +1,48 @@
-'use client';
+"use client";
 
-import { useCallback } from 'react';
-import styled from '@emotion/styled';
+import { useCallback } from "react";
+import styled from "@emotion/styled";
 
 const Field = styled.div`
-  margin-bottom: 24px;
+  margin-bottom: 36px;
 `;
 
 const Label = styled.label`
   display: block;
-  font-size: 0.7rem;
+  font-size: 8px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.9);
+  color: rgba(255, 255, 255, 0.2);
   letter-spacing: 0.1em;
   margin-bottom: 8px;
 `;
 
 const Input = styled.input`
   width: 100%;
-  background: transparent;
   border: none;
-  border-bottom: 2px solid #2d2d2d;
+  background:
+    linear-gradient(
+        90deg,
+        rgba(119, 119, 119, 0.6) 0%,
+        rgba(33, 33, 33, 0.6) 100%
+      )
+      bottom / 100% 1px no-repeat,
+    transparent;
   color: #fff;
   font-size: 1rem;
+  font-family: var(--font-pretendard-light);
+  font-weight: 300;
   padding: 10px 0;
   outline: none;
-  transition: border-color 0.2s;
 
   &::placeholder {
     color: rgba(255, 255, 255, 0.4);
   }
 
   &:focus {
-    border-bottom-color: #e63946;
+    background:
+      linear-gradient(90deg, #e63946 0%, #c1121f 100%) bottom / 100% 2px
+        no-repeat,
+      transparent;
   }
 `;
 
@@ -51,14 +61,14 @@ export default function InputForm({ values, onChange }: InputFormProps) {
     (e: React.ChangeEvent<HTMLInputElement>) => {
       onChange({ ...values, name: e.target.value });
     },
-    [values, onChange]
+    [values, onChange],
   );
 
   const handleCodeChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       onChange({ ...values, inviteCode: e.target.value });
     },
-    [values, onChange]
+    [values, onChange],
   );
 
   return (
