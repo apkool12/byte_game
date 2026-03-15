@@ -145,12 +145,20 @@ const UserIdBadge = styled.span`
 export interface HeaderProps {
   userName?: string;
   userNo?: string;
+  /** 미지정 시 /header-user.png */
+  avatarSrc?: string;
+  /** 미지정 시 "No. {userNo}" 표시 */
+  badgeText?: string;
 }
 
 export default function Header({
   userName = "우은식",
   userNo = "001",
+  avatarSrc = "/header-user.png",
+  badgeText,
 }: HeaderProps) {
+  const badge = badgeText ?? `No. ${userNo.padStart(3, "0")}`;
+
   return (
     <HeaderEl>
       <HeaderTextureLayer />
@@ -162,10 +170,10 @@ export default function Header({
         <Profile>
           <Avatar>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/header-user.png" alt="" />
+            <img src={avatarSrc} alt="" />
           </Avatar>
           <UserName>{userName}</UserName>
-          <UserIdBadge>No. {userNo.padStart(3, "0")}</UserIdBadge>
+          <UserIdBadge>{badge}</UserIdBadge>
         </Profile>
       </HeaderContent>
     </HeaderEl>

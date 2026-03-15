@@ -10,10 +10,16 @@ export default function PagesLayoutClient({
 }) {
   const pathname = usePathname();
   const isLogin = pathname === "/login";
+  const isAdmin = pathname.startsWith("/admin");
 
   return (
     <>
-      {!isLogin && <Header />}
+      {!isLogin && (
+        <Header
+          avatarSrc={isAdmin ? "/header-admin.svg" : "/header-user.png"}
+          badgeText={isAdmin ? "관리자" : undefined}
+        />
+      )}
       {children}
     </>
   );
