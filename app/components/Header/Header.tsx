@@ -2,7 +2,7 @@
 
 import styled from "@emotion/styled";
 
-const Header = styled.header`
+const HeaderEl = styled.header`
   position: relative;
   z-index: 2;
   width: 100vw;
@@ -142,17 +142,17 @@ const UserIdBadge = styled.span`
   }
 `;
 
-export interface UserHomeHeaderProps {
+export interface HeaderProps {
   userName?: string;
   userNo?: string;
 }
 
-export default function UserHomeHeader({
+export default function Header({
   userName = "우은식",
   userNo = "001",
-}: UserHomeHeaderProps) {
+}: HeaderProps) {
   return (
-    <Header>
+    <HeaderEl>
       <HeaderTextureLayer />
       <HeaderContent>
         <Title>
@@ -168,6 +168,6 @@ export default function UserHomeHeader({
           <UserIdBadge>No. {userNo.padStart(3, "0")}</UserIdBadge>
         </Profile>
       </HeaderContent>
-    </Header>
+    </HeaderEl>
   );
 }

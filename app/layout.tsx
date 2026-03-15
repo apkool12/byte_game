@@ -31,6 +31,7 @@ export default function RootLayout({
     <html lang="ko">
       <head>
         <meta name="theme-color" content="#1F0C0C" />
+        <link rel="preload" href="/byte_game_logo.svg" as="image" />
       </head>
       <body className={geist.variable}>
         <EmotionProviders>{children}</EmotionProviders>
