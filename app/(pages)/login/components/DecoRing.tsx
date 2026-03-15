@@ -6,19 +6,22 @@ const Svg = styled.svg`
   display: block;
 `;
 
-const Wrap = styled.span<{ transform?: string }>`
+const Wrap = styled.span<{ $transform?: string; $opacity?: number }>`
   display: inline-block;
-  transform: ${({ transform }) => transform ?? 'none'};
+  transform: ${({ $transform }) => $transform ?? 'none'};
+  opacity: ${({ $opacity }) => ($opacity !== undefined ? $opacity : 1)};
 `;
 
 export interface DecoRingProps {
   /** CSS transform (예: translate(10px, 20px), scale(1.2), rotate(15deg)) */
   transform?: string;
+  /** 전체 투명도 0~1 (예: 0.5 = 50%) */
+  opacity?: number;
 }
 
-export default function DecoRing({ transform }: DecoRingProps) {
+export default function DecoRing({ transform, opacity }: DecoRingProps) {
   return (
-    <Wrap transform={transform}>
+    <Wrap $transform={transform} $opacity={opacity}>
       <Svg
       xmlns="http://www.w3.org/2000/svg"
       width="134"

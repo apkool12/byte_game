@@ -1,7 +1,18 @@
+/* Pretendard Light (placeholder 등) */
+@import url("https://cdn.jsdelivr.net/npm/@fontsource/pretendard@5.2.5/300.css");
+
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+}
+
+@font-face {
+  font-family: "GameOfSquids";
+  src: url("/fonts/GameOfSquids.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
 }
 
 /* Safe area 제거: inset 0으로 고정 */
@@ -10,6 +21,8 @@
   --safe-area-inset-right: 0px;
   --safe-area-inset-bottom: 0px;
   --safe-area-inset-left: 0px;
+  --font-game-of-squids: "GameOfSquids", sans-serif;
+  --font-pretendard-light: "Pretendard", sans-serif;
 }
 
 html,
@@ -35,7 +48,7 @@ body {
 body {
   position: relative;
   /* 위 흰색 방지 */
-  background: #1e1e1e;
+  background: #000000;
 }
 
 /* 하단(주소창·검색창·safe area)까지 배경 — 그라데이션 끝색 */
