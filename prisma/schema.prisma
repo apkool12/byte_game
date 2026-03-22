@@ -1,0 +1,24 @@
+// https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// 참가자 프로필. studentId 는 로그인 시 초대코드(학번)와 매칭 (추후 해시 저장 권장)
+model User {
+  id        String  @id
+  name      String
+  teamId    String
+  roomId    String
+  no        String?
+  studentId String
+  isAdmin   Boolean @default(false)
+
+  @@map("users")
+  @@index([name, studentId])
+}

@@ -1,7 +1,71 @@
+/* Pretendard (전체 굵기 한 번에 로드 — Light 300, Black 900 구분용) */
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css");
+/* 궁서체 느낌 한글 세리프 (구운바탕) */
+@import url("https://fonts.googleapis.com/css2?family=Gowun+Batang&display=swap");
+
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+}
+
+@font-face {
+  font-family: "GameOfSquids";
+  src: url("/fonts/GameOfSquids.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "HealthsetGothicLight";
+  src: url("/fonts/Healthset%20Gothic%20Light.otf") format("opentype");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "YeotnalSajingwan";
+  src: url("/fonts/a%EC%98%9B%EB%82%A0%EC%82%AC%EC%A7%84%EA%B4%802.ttf")
+    format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "YeotnalSajingwan5";
+  src: url("/fonts/a%EC%98%9B%EB%82%A0%EC%82%AC%EC%A7%84%EA%B4%805.ttf")
+    format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Krafton";
+  src: url("/fonts/KRAFTON_FONT.otf") format("opentype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "UhBeeRami";
+  src: url("/fonts/UhBee%20Rami.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "NeoDonggeunmo";
+  src: url("https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2001@1.3/NeoDunggeunmo.woff")
+    format("woff");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
 }
 
 /* Safe area 제거: inset 0으로 고정 */
@@ -10,6 +74,18 @@
   --safe-area-inset-right: 0px;
   --safe-area-inset-bottom: 0px;
   --safe-area-inset-left: 0px;
+  --font-game-of-squids: "GameOfSquids", sans-serif;
+  --font-healthset-gothic-light: "HealthsetGothicLight", sans-serif;
+  --font-yeotnal-sajingwan: "YeotnalSajingwan", serif;
+  --font-yeotnal-sajingwan5: "YeotnalSajingwan5", serif;
+  /* Pretendard: 변수와 함께 font-weight 필수 — Light 300, Black 900 */
+  --font-pretendard-light: "Pretendard", sans-serif;
+  --font-pretendard-black: "Pretendard", sans-serif;
+  /* 궁서체 느낌: 구운바탕 웹폰트 (한글 세리프) */
+  --font-gungsuh: "Gowun Batang", "궁서", "Gungsuh", "Batang", serif;
+  --font-krafton: "Krafton", sans-serif;
+  --font-uhbee-rami: "UhBeeRami", sans-serif;
+  --font-neo-donggeunmo: "NeoDonggeunmo", sans-serif;
 }
 
 html,
@@ -21,15 +97,47 @@ body {
   min-height: 100dvh;
   overflow: hidden;
   overflow-x: hidden;
+  overscroll-behavior: none;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
+@supports (-webkit-appearance: none) and (stroke-color: transparent) {
+  html,
+  body {
+    min-height: -webkit-fill-available;
+  }
+}
+
 body {
-  background: #0a0a0a;
+  position: relative;
+  /* 위 흰색 방지 */
+  background: #000000;
+}
+
+/* 하단(주소창·검색창·safe area)까지 배경 — 그라데이션 끝색 */
+body::after {
+  content: "";
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: max(env(safe-area-inset-bottom, 0px), 220px);
+  background: #1f0707;
+  z-index: -1;
+  pointer-events: none;
 }
 
 a {
   color: inherit;
   text-decoration: none;
+}
+
+/* 하이드레이션 전 깜빡임 방지: 초기에는 숨김, 마운트 후 표시 */
+.hide-until-hydrated {
+  opacity: 0;
+}
+.hide-until-hydrated.mounted {
+  opacity: 1;
+  transition: opacity 0.2s ease-out;
 }
