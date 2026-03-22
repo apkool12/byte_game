@@ -1,9 +1,19 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { APP_NAME_ALT } from "@/data/app";
+import { getCurrentUser } from "@/data/currentUser";
+import {
+  ARIA_CLOSE,
+  CONFIRM_BUY,
+  CONFIRM_CANCEL,
+  CONFIRM_OK,
+  POINT_SUFFIX,
+} from "@/data/copy";
 import styled from "@emotion/styled";
 import { keyframes } from "@emotion/react";
 import { type ShopItemData, pickRandomShopItems } from "./shopItems";
+import { getSocket } from "@/app/socketClient";
 
 const letterUnfold = keyframes`
   from {
@@ -263,18 +273,21 @@ export default function ShopModalCard({
   items: itemsProp,
 }: ShopModalCardProps) {
   const items = useMemo(() => itemsProp ?? pickRandomShopItems(), [itemsProp]);
-  const [confirmingItem, setConfirmingItem] = useState<ShopItemData | null>(null);
+  const [confirmingItem, setConfirmingItem] = useState<ShopItemData | null>(
+    null,
+  );
+  const currentUser = getCurrentUser();
 
   return (
     <Box $isClosing={isClosing} onClick={(e) => e.stopPropagation()}>
       <TopBar />
-      <CloseBtn type="button" onClick={onClose} aria-label="닫기">
+      <CloseBtn type="button" onClick={onClose} aria-label={ARIA_CLOSE}>
         ✕
       </CloseBtn>
       <BoxInner>
         <LogoWrap>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/byte_game_logo.svg" alt="" />
+          <img src="/byte_game_logo.svg" alt={APP_NAME_ALT} />
         </LogoWrap>
         <ItemList>
           {items.map((item) => (
@@ -292,7 +305,10 @@ export default function ShopModalCard({
               </IconCircleOuter>
               <ItemStrip>
                 <ItemName>{item.name}</ItemName>
-                <ItemPrice>{item.price}P</ItemPrice>
+                <ItemPrice>
+                  {item.price}
+                  {POINT_SUFFIX}
+                </ItemPrice>
               </ItemStrip>
             </ItemRow>
           ))}
@@ -303,21 +319,36 @@ export default function ShopModalCard({
           <ConfirmBox onClick={(e) => e.stopPropagation()}>
             <ConfirmMessage>
               {confirmingItem.name}
-              <ConfirmPrice>{confirmingItem.price}P 구매하시겠습니까?</ConfirmPrice>
+              <ConfirmPrice>
+                {confirmingItem.price}
+                {POINT_SUFFIX} {CONFIRM_BUY}
+              </ConfirmPrice>
             </ConfirmMessage>
             <ConfirmButtons>
               <ConfirmBtn type="button" onClick={() => setConfirmingItem(null)}>
-                취소
+                {CONFIRM_CANCEL}
               </ConfirmBtn>
               <ConfirmBtn
                 $primary
                 type="button"
                 onClick={() => {
                   setConfirmingItem(null);
+                  if (currentUser) {
+                    // 소켓 서버로 구매 이벤트 전송 (실시간 동기화용)
+                    try {
+                      const socket = getSocket();
+                      socket.emit("team:buyItem", {
+                        teamId: currentUser.teamId,
+                        price: confirmingItem.price,
+                      });
+                    } catch {
+                      // 소켓 연결 실패 시에는 조용히 실패
+                    }
+                  }
                   onClose();
                 }}
               >
-                확인
+                {CONFIRM_OK}
               </ConfirmBtn>
             </ConfirmButtons>
           </ConfirmBox>

@@ -1,5 +1,6 @@
 "use client";
 
+import { APP_NAME } from "@/data/app";
 import styled from "@emotion/styled";
 
 const HeaderEl = styled.header`
@@ -145,27 +146,35 @@ const UserIdBadge = styled.span`
 export interface HeaderProps {
   userName?: string;
   userNo?: string;
+  /** 미지정 시 /header-user.png */
+  avatarSrc?: string;
+  /** 미지정 시 "No. {userNo}" 표시 */
+  badgeText?: string;
 }
 
 export default function Header({
-  userName = "우은식",
-  userNo = "001",
+  userName = "",
+  userNo = "",
+  avatarSrc = "/header-user.png",
+  badgeText,
 }: HeaderProps) {
+  const badge = badgeText ?? (userNo ? `No. ${userNo.padStart(3, "0")}` : "");
+
   return (
     <HeaderEl>
       <HeaderTextureLayer />
       <HeaderContent>
         <Title>
           <TitleUnderline />
-          <TitleText>BYTE GAME</TitleText>
+          <TitleText>{APP_NAME}</TitleText>
         </Title>
         <Profile>
           <Avatar>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/header-user.png" alt="" />
+            <img src={avatarSrc} alt="" />
           </Avatar>
           <UserName>{userName}</UserName>
-          <UserIdBadge>No. {userNo.padStart(3, "0")}</UserIdBadge>
+          <UserIdBadge>{badge}</UserIdBadge>
         </Profile>
       </HeaderContent>
     </HeaderEl>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { ARIA_SHOP } from "@/data/copy";
 import styled from "@emotion/styled";
 import { keyframes } from "@emotion/react";
 import ShopModalCard from "./ShopModalCard";
@@ -65,7 +66,7 @@ export default function ShopModal({ open, onClose }: ShopModalProps) {
       onClick={handleClose}
       role="dialog"
       aria-modal="true"
-      aria-label="상점"
+      aria-label={ARIA_SHOP}
     >
       <ShopModalCard isClosing={isClosing} onClose={handleClose} />
     </Overlay>

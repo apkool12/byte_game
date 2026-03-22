@@ -50,8 +50,8 @@ export interface LetterModalProps {
 export default function LetterModal({
   open,
   onClose,
-  userName = "우은식",
-  userNo = "027",
+  userName = "",
+  userNo = "",
 }: LetterModalProps) {
   const [isClosing, setIsClosing] = useState(false);
 

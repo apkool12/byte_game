@@ -33,8 +33,10 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# env files (로컬/시크릿 — 커밋 제외)
+.env
+.env.local
+.env.*.local
 
 # vercel
 .vercel
@@ -42,3 +44,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Prisma Client (generated on postinstall / prisma generate)
+/app/generated/prisma
+
+# 실명·학번(로그인용) 등 — 커밋 금지. 예시는 seed-users.example.ts
+/prisma/seed-users.ts

@@ -1,4 +1,4 @@
-import PagesLayoutClient from "./PagesLayoutClient";
+import PagesLayoutClient from "@/app/(pages)/PagesLayoutClient";
 
 export default function PagesLayout({
   children,

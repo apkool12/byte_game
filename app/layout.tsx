@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import EmotionProviders from "@/app/providers/EmotionProviders";
+import { APP_DESCRIPTION, APP_NAME } from "@/data/app";
 import "./globals.css";
 
 const geist = Geist({
@@ -9,8 +10,8 @@ const geist = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "BYTE GAME",
-  description: "The game is ready.",
+  title: APP_NAME,
+  description: APP_DESCRIPTION,
 };
 
 export const viewport: Viewport = {

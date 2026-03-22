@@ -1,5 +1,6 @@
 "use client";
 
+import { DEFAULT_MAX_SCORE, SCORE_LABEL } from "@/data/app";
 import styled from "@emotion/styled";
 import ScoreGauge from "./ScoreGauge";
 
@@ -89,7 +90,7 @@ const DEFAULT_ICON_RIGHT = 16;
 const DEFAULT_ICON_BOTTOM = 12;
 
 export interface ScoreCardProps {
-  /** 점수 0 ~ 1000 (기본 1000). 이 비율로 게이지가 줄어듦 */
+  /** 점수 0 ~ DEFAULT_MAX_SCORE. 이 비율로 게이지가 줄어듦 */
   score?: number;
   /** 아이콘(게이지) 크기 (가로 px) */
   iconSize?: number;
@@ -111,7 +112,7 @@ export interface ScoreCardProps {
 }
 
 export default function ScoreCard({
-  score = 1000,
+  score = DEFAULT_MAX_SCORE,
   iconSize = 272,
   ringScale = 1.1,
   whiteCircleScale = 1.3,
@@ -123,7 +124,7 @@ export default function ScoreCard({
   return (
     <Wrap style={{ transform, opacity }}>
       <CardDeco aria-hidden>
-        <DecoLabel>점수</DecoLabel>
+        <DecoLabel>{SCORE_LABEL}</DecoLabel>
       </CardDeco>
       <Card />
       <GaugeWrap

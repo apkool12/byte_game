@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
+import { LABEL_INVITE_CODE, LABEL_NAME } from "@/data/copy";
+import { PLACEHOLDER_INVITE_CODE, PLACEHOLDER_NAME } from "@/data/placeholders";
 import styled from "@emotion/styled";
 
 const Field = styled.div`
@@ -57,6 +59,43 @@ interface InputFormProps {
 }
 
 export default function InputForm({ values, onChange }: InputFormProps) {
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const codeInputRef = useRef<HTMLInputElement>(null);
+
+  const applyBodyFix = useCallback(() => {
+    const scrollY = window.scrollY;
+    document.body.style.overflow = "hidden";
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = "100%";
+  }, []);
+
+  const removeBodyFix = useCallback(() => {
+    const scrollY = Math.abs(parseInt(document.body.style.top || "0", 10));
+    document.body.style.overflow = "";
+    document.body.style.position = "";
+    document.body.style.top = "";
+    document.body.style.width = "";
+    window.scrollTo(0, scrollY);
+  }, []);
+
+  const handleFocus = useCallback(() => {
+    applyBodyFix();
+  }, [applyBodyFix]);
+
+  const handleBlur = useCallback(() => {
+    setTimeout(() => {
+      const active = document.activeElement;
+      const isOurInput =
+        active === nameInputRef.current || active === codeInputRef.current;
+      if (!isOurInput) removeBodyFix();
+    }, 0);
+  }, [removeBodyFix]);
+
+  useEffect(() => {
+    return () => removeBodyFix();
+  }, [removeBodyFix]);
+
   const handleNameChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       onChange({ ...values, name: e.target.value });
@@ -74,24 +113,30 @@ export default function InputForm({ values, onChange }: InputFormProps) {
   return (
     <>
       <Field>
-        <Label htmlFor="name">NAME</Label>
+        <Label htmlFor="name">{LABEL_NAME}</Label>
         <Input
+          ref={nameInputRef}
           id="name"
           type="text"
-          placeholder="Enter your name"
+          placeholder={PLACEHOLDER_NAME}
           value={values.name}
           onChange={handleNameChange}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
           autoComplete="name"
         />
       </Field>
       <Field>
-        <Label htmlFor="inviteCode">INVITE CODE</Label>
+        <Label htmlFor="inviteCode">{LABEL_INVITE_CODE}</Label>
         <Input
+          ref={codeInputRef}
           id="inviteCode"
           type="text"
-          placeholder="Enter invite code"
+          placeholder={PLACEHOLDER_INVITE_CODE}
           value={values.inviteCode}
           onChange={handleCodeChange}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
           autoComplete="off"
         />
       </Field>
