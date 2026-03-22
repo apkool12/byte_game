@@ -2,6 +2,7 @@
 
 import { createPortal } from "react-dom";
 import Image from "next/image";
+import { APP_NAME_ALT } from "@/data/app";
 import styled from "@emotion/styled";
 import { keyframes } from "@emotion/react";
 
@@ -98,11 +99,11 @@ export default function BottomPanel({
     <>
       <Overlay onClick={onClose} role="presentation" aria-hidden />
       <Panel role="dialog" aria-modal="true" aria-label={title}>
-        <Content onClick={(e) => e.stopPropagation()}>
+        <Content onClick={(e) => e.stopPropagation()} data-scroll-container>
           <LogoWrap>
             <Image
               src="/byte_game_logo.svg"
-              alt="Byte Game"
+              alt={APP_NAME_ALT}
               width={134}
               height={52}
               style={{ width: "auto", height: "42px" }}

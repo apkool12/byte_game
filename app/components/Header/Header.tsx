@@ -1,5 +1,6 @@
 "use client";
 
+import { APP_NAME } from "@/data/app";
 import styled from "@emotion/styled";
 
 const HeaderEl = styled.header`
@@ -152,12 +153,12 @@ export interface HeaderProps {
 }
 
 export default function Header({
-  userName = "우은식",
-  userNo = "001",
+  userName = "",
+  userNo = "",
   avatarSrc = "/header-user.png",
   badgeText,
 }: HeaderProps) {
-  const badge = badgeText ?? `No. ${userNo.padStart(3, "0")}`;
+  const badge = badgeText ?? (userNo ? `No. ${userNo.padStart(3, "0")}` : "");
 
   return (
     <HeaderEl>
@@ -165,7 +166,7 @@ export default function Header({
       <HeaderContent>
         <Title>
           <TitleUnderline />
-          <TitleText>BYTE GAME</TitleText>
+          <TitleText>{APP_NAME}</TitleText>
         </Title>
         <Profile>
           <Avatar>

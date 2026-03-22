@@ -3,11 +3,15 @@
 import { useEffect, useState } from "react";
 import { keyframes } from "@emotion/react";
 import styled from "@emotion/styled";
+import { getCurrentUser, getCurrentUserTeam } from "@/data/currentUser";
+import { ARIA_CLOCK, ARIA_SCORE_SHOP } from "@/data/app";
+import { letterCopy } from "@/data/letterCopy";
 import DecoRing from "../login/components/DecoRing";
 import LetterModal from "./components/LetterModal";
 import ShopModal from "./components/ShopModal";
 import GameClock from "./components/GameClock";
 import ScoreCard from "./components/ScoreCard";
+import { getSocket } from "@/app/socketClient";
 import ShopCard from "./components/ShopCard";
 
 const entranceFadeIn = keyframes`
@@ -163,6 +167,8 @@ export default function MainPage() {
   const [letterModalOpen, setLetterModalOpen] = useState(false);
   const [letterDismissed, setLetterDismissed] = useState(false);
   const [shopModalOpen, setShopModalOpen] = useState(false);
+  const [teamScore, setTeamScore] = useState(0);
+  const [pendingTeamScore, setPendingTeamScore] = useState<number | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -179,13 +185,62 @@ export default function MainPage() {
     setLetterDismissed(true);
   };
 
+  const currentUser = getCurrentUser();
+
+  // 소켓으로 조 점수 초기 로드 + 실시간 업데이트
+  useEffect(() => {
+    if (!mounted) return;
+    const user = currentUser;
+    if (!user) return;
+
+    const socket = getSocket();
+    const handleAllScores = (allScores: Record<string, number>) => {
+      const points = allScores[user.teamId];
+      if (typeof points === "number") {
+        // 모달이 열려 있으면, 닫힌 뒤에 한 번에 반영
+        if (shopModalOpen) {
+          setPendingTeamScore(points);
+        } else {
+          setTeamScore(points);
+        }
+      }
+    };
+    const handleScoreUpdated = (payload: { teamId: string; points: number }) => {
+      if (payload.teamId === user.teamId) {
+        if (shopModalOpen) {
+          setPendingTeamScore(payload.points);
+        } else {
+          setTeamScore(payload.points);
+        }
+      }
+    };
+
+    socket.on("team:allScores", handleAllScores);
+    socket.on("team:scoreUpdated", handleScoreUpdated);
+    return () => {
+      socket.off("team:allScores", handleAllScores);
+      socket.off("team:scoreUpdated", handleScoreUpdated);
+    };
+  }, [mounted, currentUser, shopModalOpen]);
+
+  // 상점 모달이 닫힐 때, 쌓아둔 점수 업데이트를 살짝 딜레이 후 적용
+  useEffect(() => {
+    if (!shopModalOpen && pendingTeamScore !== null) {
+      const t = setTimeout(() => {
+        setTeamScore(pendingTeamScore);
+        setPendingTeamScore(null);
+      }, 200); // 모달 닫힘 애니메이션 후 게이지 변화가 보이도록 약간 지연
+      return () => clearTimeout(t);
+    }
+  }, [shopModalOpen, pendingTeamScore]);
+
   return (
     <Page>
       <LetterModal
         open={letterModalOpen}
         onClose={handleCloseLetter}
-        userName="우은식"
-        userNo="027"
+        userName={currentUser?.name}
+        userNo={currentUser?.no}
       />
       <ShopModal
         open={shopModalOpen}
@@ -215,20 +270,20 @@ export default function MainPage() {
           >
             <LetterIcon>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/letter.svg" alt="편지" />
-              <UnreadBadge>1</UnreadBadge>
+              <img src="/letter.svg" alt={letterCopy.letterAlt} />
+              <UnreadBadge>{letterCopy.unreadBadgeCount}</UnreadBadge>
             </LetterIcon>
-            <LetterCaption>편지가 도착했습니다</LetterCaption>
+            <LetterCaption>{letterCopy.letterCaption}</LetterCaption>
           </LetterBlock>
         )}
         {letterDismissed && (
           <>
-            <ClockSection aria-label="현재 시각">
+            <ClockSection aria-label={ARIA_CLOCK}>
               <GameClock />
             </ClockSection>
-            <ScoreShopSection aria-label="점수 및 상점">
+            <ScoreShopSection aria-label={ARIA_SCORE_SHOP}>
               <ScoreCardWrap>
-                <ScoreCard score={1000} />
+                <ScoreCard score={teamScore} />
               </ScoreCardWrap>
               <ShopCardWrap>
                 <ShopCard onClick={() => setShopModalOpen(true)} />

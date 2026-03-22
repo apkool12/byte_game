@@ -1,9 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { keyframes } from "@emotion/react";
 import styled from "@emotion/styled";
+import {
+  LOGIN_BUTTON_TEXT,
+  LOGIN_FORM_SUBTITLE,
+  LOGIN_FORM_TITLE,
+} from "@/data/app";
 import InputForm, { type LoginFormValues } from "./components/InputForm";
+import { setCurrentUserSession } from "@/data/currentUser";
+import type { PublicUser } from "@/types/user";
 import ActionButton from "./components/ActionButton";
 import DecoRing from "./components/DecoRing";
 import BackgroundTriangle from "./components/BackgroundTriangle";
@@ -166,20 +174,44 @@ const CenterRingWrap = styled.div`
 `;
 
 export default function LoginPage() {
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [form, setForm] = useState<LoginFormValues>({
     name: "",
     inviteCode: "",
   });
+  const [loginPending, setLoginPending] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  const handleSubmit = useCallback(() => {
-    // TODO: socket 또는 API 연동
-    console.log("Submit", form);
-  }, [form]);
+  const handleSubmit = useCallback(async () => {
+    if (loginPending) return;
+    const name = form.name.trim();
+    const inviteCode = form.inviteCode.trim();
+    setLoginPending(true);
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, inviteCode }),
+      });
+      const data = (await res.json()) as { user?: PublicUser };
+      if (!res.ok || !data.user) {
+        // eslint-disable-next-line no-alert
+        alert("이름 또는 학번이 올바르지 않습니다.");
+        return;
+      }
+      setCurrentUserSession(data.user);
+      router.push(data.user.isAdmin ? "/admin" : "/main");
+    } catch {
+      // eslint-disable-next-line no-alert
+      alert("로그인 요청에 실패했습니다. 네트워크를 확인해 주세요.");
+    } finally {
+      setLoginPending(false);
+    }
+  }, [form.inviteCode, form.name, loginPending, router]);
 
   return (
     <Page>
@@ -210,14 +242,16 @@ export default function LoginPage() {
       </CenterRingWrap>
       <FormWrap $visible={SHOW_UI_COMPONENTS}>
         <FormLabel>
-          <FormLabelTitle>BYTE GAME</FormLabelTitle>
-          <FormLabelSubtitle>the Game IS READY</FormLabelSubtitle>
+          <FormLabelTitle>{LOGIN_FORM_TITLE}</FormLabelTitle>
+          <FormLabelSubtitle>{LOGIN_FORM_SUBTITLE}</FormLabelSubtitle>
         </FormLabel>
         <MainForm>
           <MainFormFields>
             <InputForm values={form} onChange={setForm} />
           </MainFormFields>
-          <ActionButton onClick={handleSubmit}>SURE</ActionButton>
+          <ActionButton onClick={handleSubmit} disabled={loginPending}>
+            {LOGIN_BUTTON_TEXT}
+          </ActionButton>
         </MainForm>
       </FormWrap>
       </div>

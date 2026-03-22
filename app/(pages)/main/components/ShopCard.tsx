@@ -1,5 +1,6 @@
 "use client";
 
+import { ARIA_SHOP, ARIA_SHOP_OPEN } from "@/data/copy";
 import Image from "next/image";
 import styled from "@emotion/styled";
 
@@ -123,9 +124,9 @@ export default function ShopCard({
         role="button"
         tabIndex={0}
         onKeyDown={(e) => e.key === "Enter" && onClick?.()}
-        aria-label="상점 열기"
+        aria-label={ARIA_SHOP_OPEN}
       >
-        <DecoLabel>상점</DecoLabel>
+        <DecoLabel>{ARIA_SHOP}</DecoLabel>
       </CardDeco>
       <Card
         onClick={onClick}
@@ -137,7 +138,7 @@ export default function ShopCard({
         <IconWrap>
           <Image
             src="/shop.svg"
-            alt="상점"
+            alt={ARIA_SHOP}
             fill
             style={{ objectFit: "contain" }}
           />

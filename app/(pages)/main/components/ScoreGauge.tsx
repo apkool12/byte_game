@@ -1,5 +1,6 @@
 "use client";
 
+import { DEFAULT_MAX_SCORE } from "@/data/app";
 import styled from "@emotion/styled";
 import { useId } from "react";
 
@@ -71,7 +72,7 @@ const CENTER_X = 95;
 const CENTER_Y = 85.5;
 
 export interface ScoreGaugeProps {
-  /** 점수 0 ~ 1000 (기본 1000). 이 비율로 게이지 호가 줄어듦 */
+  /** 점수 0 ~ DEFAULT_MAX_SCORE. 이 비율로 게이지 호가 줄어듦 */
   score?: number;
   /** 아이콘(게이지) 크기 (가로 px, 세로는 비율 유지) */
   iconSize?: number;
@@ -87,7 +88,7 @@ export interface ScoreGaugeProps {
 }
 
 export default function ScoreGauge({
-  score = 1000,
+  score = DEFAULT_MAX_SCORE,
   iconSize = 84,
   radius = 50,
   ringScale = 1,
@@ -101,8 +102,8 @@ export default function ScoreGauge({
 
   const progressStrokeWidth = radius * (18 / 50);
   const circumference = 2 * Math.PI * radius;
-  const clampedScore = Math.min(1000, Math.max(0, score));
-  const progress = clampedScore / 1000;
+  const clampedScore = Math.min(DEFAULT_MAX_SCORE, Math.max(0, score));
+  const progress = clampedScore / DEFAULT_MAX_SCORE;
   const drawLength = progress * circumference;
   const gapLength = circumference - drawLength;
 

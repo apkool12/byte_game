@@ -1,9 +1,33 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import styled from "@emotion/styled";
+import {
+  ADMIN_MENU_CARDS,
+  ADMIN_MENU_ROW_BUTTONS,
+  type AdminPanelTitle,
+} from "@/data/adminMenu";
+import {
+  formatAdminGameFooterLine,
+  getStoredAdminGameSession,
+  ADMIN_GAME_SESSION_EVENT,
+} from "@/data/adminGames";
+import { getCurrentUser } from "@/data/currentUser";
+import {
+  SHOW_LOG_TITLE,
+  SHOP_SETTING_TITLE,
+  GAME_MANAGE_PANEL_TITLE,
+} from "@/data/copy";
+import { roomFooterText } from "@/data/room";
 import BottomPanel from "./components/BottomPanel";
 import PersonalManagePanel from "./components/PersonalManagePanel";
+import TeamManagePanel from "./components/TeamManagePanel";
+import ShopManagePanel from "./components/ShopManagePanel";
+import GameManagePanel from "./components/GameManagePanel";
+
+const SHOP_PANEL_LABEL = ADMIN_MENU_ROW_BUTTONS[0].label;
+const GAME_PANEL_LABEL = ADMIN_MENU_ROW_BUTTONS[1].label;
 
 const Page = styled.main`
   position: relative;
@@ -109,7 +133,6 @@ const Card = styled.button`
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
   cursor: pointer;
   box-sizing: border-box;
   transition: opacity 0.2s ease;
@@ -227,15 +250,76 @@ const FooterText = styled.p`
 `;
 
 export default function AdminMainPage() {
+  const router = useRouter();
   const [panelOpen, setPanelOpen] = useState(false);
-  const [panelTitle, setPanelTitle] = useState("");
+  const [panelTitle, setPanelTitle] = useState<AdminPanelTitle>(
+    ADMIN_MENU_CARDS[0].label,
+  );
+  const [panelSubView, setPanelSubView] = useState<"main" | "showLog">("main");
+  const [allowed, setAllowed] = useState<boolean | null>(null);
+  const [footerLine, setFooterLine] = useState(roomFooterText);
 
-  const openPanel = (title: string) => {
+  useEffect(() => {
+    const user = getCurrentUser();
+    if (!user) {
+      router.replace("/login");
+      return;
+    }
+    if (!user.isAdmin) {
+      router.replace("/main");
+      return;
+    }
+    setAllowed(true);
+  }, [router]);
+
+  useEffect(() => {
+    const syncFooter = () => {
+      setFooterLine(
+        formatAdminGameFooterLine(getStoredAdminGameSession()),
+      );
+    };
+    syncFooter();
+    if (typeof window === "undefined") return undefined;
+    window.addEventListener(ADMIN_GAME_SESSION_EVENT, syncFooter);
+    window.addEventListener("storage", syncFooter);
+    return () => {
+      window.removeEventListener(ADMIN_GAME_SESSION_EVENT, syncFooter);
+      window.removeEventListener("storage", syncFooter);
+    };
+  }, []);
+
+  const openPanel = (title: AdminPanelTitle) => {
     setPanelTitle(title);
+    setPanelSubView("main");
     setPanelOpen(true);
   };
 
   const closePanel = () => setPanelOpen(false);
+
+  // 패널 열려 있을 때 body 스크롤 잠금 — 헤더가 올라가는 현상 방지
+  useEffect(() => {
+    if (!panelOpen) return;
+    const scrollY = window.scrollY;
+    const prevOverflow = document.body.style.overflow;
+    const prevPosition = document.body.style.position;
+    const prevTop = document.body.style.top;
+    const prevWidth = document.body.style.width;
+    document.body.style.overflow = "hidden";
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = "100%";
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.body.style.position = prevPosition;
+      document.body.style.top = prevTop;
+      document.body.style.width = prevWidth;
+      window.scrollTo(0, scrollY);
+    };
+  }, [panelOpen]);
+
+  if (allowed !== true) {
+    return null;
+  }
 
   return (
     <Page>
@@ -249,65 +333,62 @@ export default function AdminMainPage() {
       </TextureOverlay>
       <ContentWrap>
         <CardGrid>
-          <Card
-            type="button"
-            aria-label="개인 관리"
-            onClick={() => openPanel("개인 관리")}
-          >
-            <CardLogoSmall aria-hidden>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/byte_game_logo.svg" alt="" />
-            </CardLogoSmall>
-            <CardIconWrap aria-hidden>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/admin_member.svg" alt="" />
-            </CardIconWrap>
-            <CardLabel>개인 관리</CardLabel>
-          </Card>
-          <Card
-            type="button"
-            aria-label="조별 관리"
-            onClick={() => openPanel("조별 관리")}
-          >
-            <CardLogoSmall aria-hidden>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/byte_game_logo.svg" alt="" />
-            </CardLogoSmall>
-            <CardIconWrap aria-hidden>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/admin_group.svg" alt="" />
-            </CardIconWrap>
-            <CardLabel>조별 관리</CardLabel>
-          </Card>
+          {ADMIN_MENU_CARDS.map((item) => (
+            <Card
+              key={item.id}
+              type="button"
+              aria-label={item.label}
+              onClick={() => openPanel(item.label)}
+            >
+              <CardLogoSmall aria-hidden>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/byte_game_logo.svg" alt="" />
+              </CardLogoSmall>
+              <CardIconWrap aria-hidden>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={item.iconSrc} alt="" />
+              </CardIconWrap>
+              <CardLabel>{item.label}</CardLabel>
+            </Card>
+          ))}
         </CardGrid>
         <RowButtons>
-          <RowButton
-            type="button"
-            aria-label="상점 관리"
-            onClick={() => openPanel("상점 관리")}
-          >
-            <RowButtonIcon aria-hidden>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/shop.svg" alt="" />
-            </RowButtonIcon>
-            <RowButtonLabel>상점 관리</RowButtonLabel>
-          </RowButton>
-          <RowButton
-            type="button"
-            aria-label="게임 관리"
-            onClick={() => openPanel("게임 관리")}
-          >
-            <RowButtonIcon aria-hidden>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/admin_game.svg" alt="" />
-            </RowButtonIcon>
-            <RowButtonLabel>게임 관리</RowButtonLabel>
-          </RowButton>
+          {ADMIN_MENU_ROW_BUTTONS.map((item) => (
+            <RowButton
+              key={item.id}
+              type="button"
+              aria-label={item.label}
+              onClick={() => openPanel(item.label)}
+            >
+              <RowButtonIcon aria-hidden>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={item.iconSrc} alt="" />
+              </RowButtonIcon>
+              <RowButtonLabel>{item.label}</RowButtonLabel>
+            </RowButton>
+          ))}
         </RowButtons>
-        <FooterText>현재 7번방, 마피아 게임 담당입니다.</FooterText>
+        <FooterText>{footerLine}</FooterText>
       </ContentWrap>
-      <BottomPanel open={panelOpen} onClose={closePanel} title={panelTitle}>
-        {panelTitle === "개인 관리" && <PersonalManagePanel />}
+      <BottomPanel
+        open={panelOpen}
+        onClose={closePanel}
+        title={
+          panelTitle === ADMIN_MENU_CARDS[1].label && panelSubView === "showLog"
+            ? SHOW_LOG_TITLE
+            : panelTitle === SHOP_PANEL_LABEL
+              ? SHOP_SETTING_TITLE
+              : panelTitle === GAME_PANEL_LABEL
+                ? GAME_MANAGE_PANEL_TITLE
+                : panelTitle
+        }
+      >
+        {panelTitle === ADMIN_MENU_CARDS[0].label && <PersonalManagePanel />}
+        {panelTitle === ADMIN_MENU_CARDS[1].label && (
+          <TeamManagePanel onViewChange={setPanelSubView} />
+        )}
+        {panelTitle === SHOP_PANEL_LABEL && <ShopManagePanel />}
+        {panelTitle === GAME_PANEL_LABEL && <GameManagePanel />}
       </BottomPanel>
     </Page>
   );

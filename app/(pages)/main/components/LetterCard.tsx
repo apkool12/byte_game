@@ -1,5 +1,8 @@
 "use client";
 
+import { ARIA_CLOSE, NAME_SUFFIX } from "@/data/copy";
+import { APP_NAME_ALT } from "@/data/app";
+import { letterCopy } from "@/data/letterCopy";
 import styled from "@emotion/styled";
 import { keyframes } from "@emotion/react";
 
@@ -153,43 +156,37 @@ export interface LetterCardProps {
 export default function LetterCard({
   isClosing = false,
   onClose,
-  userName = "우은식",
-  userNo = "027",
+  userName = "",
+  userNo = "",
 }: LetterCardProps) {
   return (
     <Box $isClosing={isClosing} onClick={(e) => e.stopPropagation()}>
       <TopBar />
-      <CloseBtn type="button" onClick={onClose} aria-label="닫기">
+      <CloseBtn type="button" onClick={onClose} aria-label={ARIA_CLOSE}>
         ✕
       </CloseBtn>
       <BoxInner>
         <LogoWrap>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/byte_game_logo.svg" alt="" />
+          <img src="/byte_game_logo.svg" alt={APP_NAME_ALT} />
         </LogoWrap>
         <div>
-          <NameChip>{userName}님</NameChip>
+          <NameChip>{userName}{NAME_SUFFIX}</NameChip>
         </div>
-        <BodyText $font="yeotnal">게임에 참여하신 것을 환영합니다.</BodyText>
+        <BodyText $font="yeotnal">{letterCopy.welcome}</BodyText>
         <NumberBlock>
-          <BodyText $font="yeotnal">당신의 번호는</BodyText>
+          <BodyText $font="yeotnal">{letterCopy.yourNumber}</BodyText>
           <BodyText $font="yeotnal" $red>
             No. {userNo.padStart(3, "0")}
           </BodyText>
         </NumberBlock>
         <InstructionBlock>
           <BodyText $font="healthset" $muted>
-            {
-              "스스로의 판단을 믿으십시오.\n파악하려 하지 마십시오.\n이를, 기억하십시오."
-            }
+            {letterCopy.instruction}
           </BodyText>
         </InstructionBlock>
-        <BodyText $font="yeotnal">
-          {
-            "지금부터 당신은 게임의 참가자입니다.\n모든 게임은 공정하게 진행됩니다."
-          }
-        </BodyText>
-        <GoodLuck>행운을 빕니다.</GoodLuck>
+        <BodyText $font="yeotnal">{letterCopy.participant}</BodyText>
+        <GoodLuck>{letterCopy.goodLuck}</GoodLuck>
       </BoxInner>
     </Box>
   );
