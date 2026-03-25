@@ -33,8 +33,10 @@ export const BTN_ADD_SHOP_ITEM = "항목 추가";
 export const BTN_SAVE_SHOP_CATALOG = "저장";
 export const SHOP_CATALOG_SAVE_DONE = "저장되었습니다.";
 export const SHOP_CATALOG_SAVE_FAIL =
-  "저장에 실패했습니다. 소켓 서버를 확인해 주세요.";
+  "저장에 실패했습니다. 네트워크를 확인해 주세요.";
 export const SHOP_CATALOG_EMPTY = "등록된 상품이 없습니다.";
+export const SHOP_CATALOG_LOADING = "상품을 불러오는 중…";
+export const SHOP_CATALOG_LOAD_FAIL = "상품을 불러오지 못했습니다.";
 export const ARIA_REMOVE_SHOP_ITEM = "항목 삭제";
 export const DEFAULT_NEW_SHOP_ITEM_NAME = "새 상품";
 export const SHOP_DELETE_CONFIRM = "삭제하시겠습니까?";

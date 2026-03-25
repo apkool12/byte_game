@@ -1,10 +1,20 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { ARIA_SHOP } from "@/data/copy";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import {
+  ARIA_SHOP,
+  SHOP_CATALOG_EMPTY,
+  SHOP_CATALOG_LOADING,
+  SHOP_CATALOG_LOAD_FAIL,
+} from "@/data/copy";
+import type { ShopItemRecord } from "@/data/shopItems";
 import styled from "@emotion/styled";
 import { keyframes } from "@emotion/react";
 import ShopModalCard from "./ShopModalCard";
+import {
+  pickRandomShopItemsFromRecords,
+  type ShopItemData,
+} from "./shopItems";
 
 const overlayFadeIn = keyframes`
   from { opacity: 0; }
@@ -44,14 +54,45 @@ const CLOSE_DURATION_MS = 420;
 export interface ShopModalProps {
   open: boolean;
   onClose: () => void;
+  /** null = 로딩 중, [] = 비어 있음 또는 실패 후 빈 목록 */
+  catalogRecords: ShopItemRecord[] | null;
+  catalogError?: boolean;
 }
 
-export default function ShopModal({ open, onClose }: ShopModalProps) {
+export default function ShopModal({
+  open,
+  onClose,
+  catalogRecords,
+  catalogError = false,
+}: ShopModalProps) {
   const [isClosing, setIsClosing] = useState(false);
+  const [displayItems, setDisplayItems] = useState<ShopItemData[] | null>(
+    null,
+  );
 
   useEffect(() => {
     if (open) setIsClosing(false);
   }, [open]);
+
+  useEffect(() => {
+    if (!open) {
+      setDisplayItems(null);
+      return;
+    }
+    if (catalogRecords === null) {
+      setDisplayItems(null);
+      return;
+    }
+    setDisplayItems(pickRandomShopItemsFromRecords(catalogRecords));
+  }, [open, catalogRecords]);
+
+  const statusMessage = useMemo(() => {
+    if (catalogRecords === null && !catalogError) return SHOP_CATALOG_LOADING;
+    if (catalogError) return SHOP_CATALOG_LOAD_FAIL;
+    if (catalogRecords !== null && catalogRecords.length === 0)
+      return SHOP_CATALOG_EMPTY;
+    return null;
+  }, [catalogRecords, catalogError]);
 
   const handleClose = useCallback(() => {
     setIsClosing(true);
@@ -68,7 +109,12 @@ export default function ShopModal({ open, onClose }: ShopModalProps) {
       aria-modal="true"
       aria-label={ARIA_SHOP}
     >
-      <ShopModalCard isClosing={isClosing} onClose={handleClose} />
+      <ShopModalCard
+        isClosing={isClosing}
+        onClose={handleClose}
+        items={displayItems}
+        statusMessage={statusMessage}
+      />
     </Overlay>
   );
 }

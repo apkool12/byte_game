@@ -1,3 +1,7 @@
+const path = require("path");
+// EC2 등에서 프로젝트 루트의 .env 로드 (pm2 cwd와 무관하게 동일 경로)
+require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
+
 const http = require("http");
 const { Server } = require("socket.io");
 
@@ -22,51 +26,49 @@ function addScoreLog(entry) {
   if (scoreChangeLogs.length > MAX_LOGS) scoreChangeLogs.pop();
 }
 
-/** 상점 카탈로그 (서버 기준, 어드민에서 수정 시 전 클라이언트에 브로드캐스트) */
-const DEFAULT_SHOP_CATALOG = [
-  { id: "toilet", name: "화장실", price: 500, iconSrc: "/item-toilet.svg" },
-  { id: "for-you", name: "너를 위해", price: 500, iconSrc: "/item-score..svg" },
-  {
-    id: "praise-sticker",
-    name: "칭찬 스티커",
-    price: 500,
-    iconSrc: "/item-quesiton.svg",
-  },
-  { id: "choice", name: "선택권", price: 500, iconSrc: "/item-quesiton.svg" },
-  { id: "donation", name: "기부", price: 500, iconSrc: "/item-quesiton.svg" },
-  { id: "lottery", name: "뽑기", price: 500, iconSrc: "/item-quesiton.svg" },
-  { id: "cupramen", name: "컵라면", price: 500, iconSrc: "/item-food.svg" },
-  { id: "milk", name: "우유", price: 500, iconSrc: "/item-food.svg" },
-  { id: "shield", name: "방어", price: 500, iconSrc: "/item-shield.svg" },
-];
-
-let shopCatalog = DEFAULT_SHOP_CATALOG.map((row) => ({ ...row }));
-
-function normalizeShopItem(raw) {
-  if (!raw || typeof raw !== "object") return null;
-  const id = typeof raw.id === "string" && raw.id.trim() ? raw.id.trim() : null;
-  const name =
-    typeof raw.name === "string" ? raw.name.trim().slice(0, 80) : "";
-  const price = Math.max(0, Math.min(1_000_000, Math.floor(Number(raw.price))));
-  const iconSrc =
-    typeof raw.iconSrc === "string" && raw.iconSrc.startsWith("/")
-      ? raw.iconSrc.slice(0, 200)
-      : "/item-quesiton.svg";
-  if (!id || !name || Number.isNaN(price)) return null;
-  return { id, name, price, iconSrc };
+/** Next 앱 기준 URL — 소켓 서버가 카탈로그 API를 호출할 때 사용 */
+function getAppBaseUrl() {
+  const explicit =
+    process.env.PUBLIC_APP_URL || process.env.NEXT_PUBLIC_APP_URL;
+  if (explicit) return String(explicit).replace(/\/$/, "");
+  const vercel = process.env.VERCEL_URL;
+  if (vercel) return `https://${String(vercel).replace(/\/$/, "")}`;
+  return null;
 }
 
-function normalizeShopCatalog(items) {
-  if (!Array.isArray(items) || items.length === 0) return null;
-  const seen = new Set();
-  const out = [];
-  for (const raw of items) {
-    const row = normalizeShopItem(raw);
-    if (!row || seen.has(row.id)) continue;
-    seen.add(row.id);
-    out.push(row);
+const CATALOG_TTL_MS = 60_000;
+let catalogCache = { items: null, at: 0 };
+
+async function fetchShopCatalogFromApi() {
+  const base = getAppBaseUrl();
+  if (!base) {
+    console.warn(
+      "[socket] PUBLIC_APP_URL (or NEXT_PUBLIC_APP_URL) unset; cannot load shop catalog for purchase validation",
+    );
+    return null;
   }
-  return out.length > 0 ? out : null;
+  try {
+    const res = await fetch(`${base}/api/shop/catalog`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const items = data?.items;
+    return Array.isArray(items) ? items : null;
+  } catch (err) {
+    console.error("[socket] fetchShopCatalogFromApi", err);
+    return null;
+  }
+}
+
+async function getCatalogItemsCached() {
+  const now = Date.now();
+  if (catalogCache.items && now - catalogCache.at < CATALOG_TTL_MS) {
+    return catalogCache.items;
+  }
+  const items = await fetchShopCatalogFromApi();
+  if (items) {
+    catalogCache = { items, at: now };
+  }
+  return items;
 }
 
 /** 메모리 상의 조별 점수 (서버 기준 진실 데이터) */
@@ -92,53 +94,52 @@ const io = new Server(httpServer, {
 io.on("connection", (socket) => {
   // 클라이언트가 접속하면 현재 전체 점수 한 번 내려주기 (선택 사항)
   socket.emit("team:allScores", teamPoints);
-  socket.emit("shop:catalog", shopCatalog);
 
   // 어드민 등에서 나중에 연결된 화면이 현재 점수를 요청할 때
   socket.on("team:requestAllScores", () => {
     socket.emit("team:allScores", teamPoints);
   });
 
-  socket.on("shop:requestCatalog", () => {
-    socket.emit("shop:catalog", shopCatalog);
+  socket.on("admin:notifyShopCatalogChanged", () => {
+    catalogCache = { items: null, at: 0 };
+    io.emit("shop:catalogChanged");
   });
 
-  socket.on("admin:setShopCatalog", (payload, ack) => {
+  // 상점에서 구매 요청 (itemId 있으면 Next API 카탈로그로 가격 검증)
+  socket.on("team:buyItem", async (payload) => {
     try {
-      const items = payload?.items;
-      const next = normalizeShopCatalog(items);
-      if (!next) {
-        if (typeof ack === "function") ack({ ok: false });
-        return;
+      const { teamId, itemId, price } = payload || {};
+      if (!teamId) return;
+
+      let charge = null;
+      if (typeof itemId === "string" && itemId.length > 0) {
+        const catalog = await getCatalogItemsCached();
+        if (!catalog) {
+          console.warn("[socket] team:buyItem catalog unavailable");
+          return;
+        }
+        const row = catalog.find((r) => r && r.id === itemId);
+        if (!row) return;
+        const serverPrice = Number(row.price);
+        if (typeof price !== "number" || Number(price) !== serverPrice) return;
+        charge = serverPrice;
+      } else {
+        if (typeof price !== "number") return;
+        charge = price;
       }
-      shopCatalog = next;
-      io.emit("shop:catalog", shopCatalog);
-      if (typeof ack === "function") ack({ ok: true });
-    } catch (err) {
-      console.error("admin:setShopCatalog error", err);
-      if (typeof ack === "function") ack({ ok: false });
-    }
-  });
-
-  // 상점에서 구매 요청
-  socket.on("team:buyItem", (payload) => {
-    try {
-      const { teamId, price } = payload || {};
-      if (!teamId || typeof price !== "number") return;
 
       const current = teamPoints[teamId] ?? 0;
-      const next = Math.max(0, current - price);
+      const next = Math.max(0, current - charge);
       teamPoints[teamId] = next;
 
       addScoreLog({
         teamId,
         teamName: teamId.replace("team-", "") + "조",
-        delta: -price,
+        delta: -charge,
         processorName: "상점",
         timestamp: Date.now(),
       });
 
-      // 모든 클라이언트에 최신 점수 브로드캐스트
       io.emit("team:scoreUpdated", { teamId, points: next });
     } catch (err) {
       console.error("team:buyItem error", err);

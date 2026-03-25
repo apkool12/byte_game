@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { keyframes } from "@emotion/react";
 import styled from "@emotion/styled";
-import { getCurrentUser, getCurrentUserTeam } from "@/data/currentUser";
+import { getCurrentUser } from "@/data/currentUser";
 import { ARIA_CLOCK, ARIA_SCORE_SHOP } from "@/data/app";
 import { letterCopy } from "@/data/letterCopy";
 import DecoRing from "../login/components/DecoRing";
@@ -13,6 +13,7 @@ import GameClock from "./components/GameClock";
 import ScoreCard from "./components/ScoreCard";
 import { getSocket } from "@/app/socketClient";
 import ShopCard from "./components/ShopCard";
+import type { ShopItemRecord } from "@/data/shopItems";
 
 const entranceFadeIn = keyframes`
   from { opacity: 0; }
@@ -152,8 +153,7 @@ const ShopCardWrap = styled.div`
   transform: translateY(12px);
 `;
 
-/** true면 메인에 게임 편지 + 안 읽음 1 표시 */
-const HAS_UNREAD_LETTER = true;
+const LETTER_SEEN_STORAGE_PREFIX = "byte-game-letter-seen:";
 
 /** 공포 느낌 햅틱: 불규칙한 짧은 진동 패턴 (지원 시에만) */
 function triggerCreepyHaptic() {
@@ -165,24 +165,109 @@ function triggerCreepyHaptic() {
 export default function MainPage() {
   const [mounted, setMounted] = useState(false);
   const [letterModalOpen, setLetterModalOpen] = useState(false);
+  const [hasUnreadLetter, setHasUnreadLetter] = useState(true);
   const [letterDismissed, setLetterDismissed] = useState(false);
   const [shopModalOpen, setShopModalOpen] = useState(false);
+  const [shopCatalog, setShopCatalog] = useState<ShopItemRecord[] | null>(null);
+  const [shopCatalogError, setShopCatalogError] = useState(false);
   const [teamScore, setTeamScore] = useState(0);
   const [pendingTeamScore, setPendingTeamScore] = useState<number | null>(null);
+
+  const loadShopCatalog = useCallback(async () => {
+    try {
+      const res = await fetch("/api/shop/catalog");
+      if (!res.ok) {
+        setShopCatalog([]);
+        setShopCatalogError(true);
+        return;
+      }
+      const data: unknown = await res.json();
+      const raw =
+        data && typeof data === "object" && "items" in data
+          ? (data as { items: unknown }).items
+          : null;
+      if (!Array.isArray(raw)) {
+        setShopCatalog([]);
+        setShopCatalogError(true);
+        return;
+      }
+      const next: ShopItemRecord[] = [];
+      for (const row of raw) {
+        if (!row || typeof row !== "object") continue;
+        const o = row as Record<string, unknown>;
+        const id = typeof o.id === "string" ? o.id : "";
+        const name = typeof o.name === "string" ? o.name : "";
+        const price = Number(o.price);
+        const iconSrc =
+          typeof o.iconSrc === "string" ? o.iconSrc : "/item-quesiton.svg";
+        if (!id || !name || Number.isNaN(price)) continue;
+        next.push({ id, name, price, iconSrc });
+      }
+      setShopCatalogError(false);
+      setShopCatalog(next);
+    } catch {
+      setShopCatalog([]);
+      setShopCatalogError(true);
+    }
+  }, []);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
+  // 편지는 "유저별로 최초 1회만" 보여주기 (localStorage 기반)
   useEffect(() => {
-    if (!mounted || !HAS_UNREAD_LETTER || letterDismissed) return;
+    if (!mounted) return;
+    const user = getCurrentUser();
+    if (!user?.id) return;
+    const key = `${LETTER_SEEN_STORAGE_PREFIX}${user.id}`;
+    const seen = window.localStorage.getItem(key) === "1";
+    if (seen) {
+      setHasUnreadLetter(false);
+      setLetterDismissed(true);
+      setLetterModalOpen(false);
+      return;
+    }
+    setHasUnreadLetter(true);
+    setLetterDismissed(false);
+    // 로그인 직후 편지는 1회 자동 오픈
+    const t = setTimeout(() => {
+      setLetterModalOpen(true);
+    }, 250);
+    return () => clearTimeout(t);
+  }, [mounted]);
+
+  useEffect(() => {
+    if (!mounted) return;
+    void loadShopCatalog();
+  }, [mounted, loadShopCatalog]);
+
+  useEffect(() => {
+    if (!mounted) return;
+    const socket = getSocket();
+    const onCatalogChanged = () => {
+      void loadShopCatalog();
+    };
+    socket.on("shop:catalogChanged", onCatalogChanged);
+    return () => {
+      socket.off("shop:catalogChanged", onCatalogChanged);
+    };
+  }, [mounted, loadShopCatalog]);
+
+  useEffect(() => {
+    if (!mounted || !hasUnreadLetter || letterDismissed) return;
     const t = setTimeout(triggerCreepyHaptic, 800);
     return () => clearTimeout(t);
-  }, [mounted, letterDismissed]);
+  }, [mounted, hasUnreadLetter, letterDismissed]);
 
   const handleCloseLetter = () => {
     setLetterModalOpen(false);
     setLetterDismissed(true);
+    const user = getCurrentUser();
+    if (user?.id) {
+      window.localStorage.setItem(`${LETTER_SEEN_STORAGE_PREFIX}${user.id}`, "1");
+    }
+    setHasUnreadLetter(false);
   };
 
   const currentUser = getCurrentUser();
@@ -217,6 +302,8 @@ export default function MainPage() {
 
     socket.on("team:allScores", handleAllScores);
     socket.on("team:scoreUpdated", handleScoreUpdated);
+    // 연결 시점에 이미 allScores 이벤트가 지나갔을 수 있으니, 리스너 등록 후 한 번 요청
+    socket.emit("team:requestAllScores");
     return () => {
       socket.off("team:allScores", handleAllScores);
       socket.off("team:scoreUpdated", handleScoreUpdated);
@@ -245,6 +332,8 @@ export default function MainPage() {
       <ShopModal
         open={shopModalOpen}
         onClose={() => setShopModalOpen(false)}
+        catalogRecords={shopCatalog}
+        catalogError={shopCatalogError}
       />
       <div
         className={`hide-until-hydrated ${mounted ? "mounted" : ""}`}
@@ -261,7 +350,7 @@ export default function MainPage() {
         <TopRightDeco>
           <DecoRing transform="translate(30px, 20px) scale(1.2)" />
         </TopRightDeco>
-        {HAS_UNREAD_LETTER && !letterDismissed && (
+        {hasUnreadLetter && !letterDismissed && (
           <LetterBlock
             onClick={() => setLetterModalOpen(true)}
             role="button"

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
+import type { ShopItemRecord } from "@/data/shopItems";
 import {
   SHOP_DISPLAY_COUNT,
-  SHOP_ITEM_RECORDS,
   TOILET_ITEM_ID as DATA_TOILET_ID,
 } from "@/data/shopItems";
 
@@ -17,19 +17,24 @@ export const TOILET_ITEM_ID = DATA_TOILET_ID;
 
 const iconStyle = { width: 38, height: 38, objectFit: "contain" as const };
 
-/** 상점에 등장할 수 있는 전체 아이템 목록 (data 기반, 아이콘만 컴포넌트에서 생성) */
-export const SHOP_ITEMS: ShopItemData[] = SHOP_ITEM_RECORDS.map((record) => ({
-  id: record.id,
-  name: record.name,
-  price: record.price,
-  icon: (
-    <img src={record.iconSrc} alt="" width={38} height={38} style={iconStyle} />
-  ),
-}));
+export function recordsToShopItemData(records: ShopItemRecord[]): ShopItemData[] {
+  return records.map((record) => ({
+    id: record.id,
+    name: record.name,
+    price: record.price,
+    icon: (
+      // eslint-disable-next-line @next/next/no-img-element -- 동적 public 아이콘 경로
+      <img
+        src={record.iconSrc}
+        alt=""
+        width={38}
+        height={38}
+        style={iconStyle}
+      />
+    ),
+  }));
+}
 
-/**
- * 화장실을 항상 첫 번째로 두고, 나머지는 풀에서 랜덤 선택.
- */
 function shuffleArray<T>(arr: T[]): T[] {
   const out = [...arr];
   for (let i = out.length - 1; i > 0; i--) {
@@ -39,12 +44,21 @@ function shuffleArray<T>(arr: T[]): T[] {
   return out;
 }
 
-export function pickRandomShopItems(): ShopItemData[] {
-  const toilet = SHOP_ITEMS.find((item) => item.id === TOILET_ITEM_ID);
-  const others = SHOP_ITEMS.filter((item) => item.id !== TOILET_ITEM_ID);
+/**
+ * 화장실을 항상 첫 번째로 두고, 나머지는 풀에서 랜덤 선택.
+ * records 가 비어 있으면 빈 배열.
+ */
+export function pickRandomShopItemsFromRecords(
+  records: ShopItemRecord[],
+): ShopItemData[] {
+  const items = recordsToShopItemData(records);
+  if (items.length === 0) return [];
+
+  const toilet = items.find((item) => item.id === TOILET_ITEM_ID);
+  const others = items.filter((item) => item.id !== TOILET_ITEM_ID);
 
   if (!toilet) {
-    return shuffleArray(SHOP_ITEMS).slice(0, SHOP_DISPLAY_COUNT);
+    return shuffleArray(items).slice(0, SHOP_DISPLAY_COUNT);
   }
 
   const shuffled = shuffleArray(others);

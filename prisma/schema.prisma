@@ -22,3 +22,14 @@ model User {
   @@map("users")
   @@index([name, studentId])
 }
+
+/// 상점 카탈로그 (가격·이름은 DB 가 기준)
+model ShopItem {
+  id        String @id
+  name      String
+  price     Int
+  iconSrc   String
+  sortOrder Int    @default(0)
+
+  @@map("shop_items")
+}

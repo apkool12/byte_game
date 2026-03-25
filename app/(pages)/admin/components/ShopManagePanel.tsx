@@ -1,11 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  type ShopItemRecord,
-  SHOP_ITEM_RECORDS,
-  TOILET_ITEM_ID,
-} from "@/data/shopItems";
+import { type ShopItemRecord, TOILET_ITEM_ID } from "@/data/shopItems";
 import {
   ARIA_REMOVE_SHOP_ITEM,
   BTN_ADD_SHOP_ITEM,
@@ -237,9 +233,7 @@ function cloneRecords(records: ShopItemRecord[]): ShopItemRecord[] {
 }
 
 export default function ShopManagePanel() {
-  const [items, setItems] = useState<ShopItemRecord[]>(() =>
-    cloneRecords(SHOP_ITEM_RECORDS),
-  );
+  const [items, setItems] = useState<ShopItemRecord[]>([]);
   const [saving, setSaving] = useState(false);
   const [hint, setHint] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<ShopItemRecord | null>(null);
@@ -247,29 +241,35 @@ export default function ShopManagePanel() {
   const [iconPickRowId, setIconPickRowId] = useState<string | null>(null);
 
   useEffect(() => {
-    const socket = getSocket();
-    const onCatalog = (payload: unknown) => {
-      if (!Array.isArray(payload) || payload.length === 0) return;
-      const next: ShopItemRecord[] = [];
-      for (const row of payload) {
-        if (!row || typeof row !== "object") continue;
-        const o = row as Record<string, unknown>;
-        const id = typeof o.id === "string" ? o.id : "";
-        const name = typeof o.name === "string" ? o.name : "";
-        const price = Number(o.price);
-        const iconSrc =
-          typeof o.iconSrc === "string" ? o.iconSrc : DEFAULT_ICON;
-        if (!id || !name || Number.isNaN(price)) continue;
-        next.push({ id, name, price, iconSrc });
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/shop/catalog");
+        const data: unknown = await res.json();
+        const raw =
+          data && typeof data === "object" && "items" in data
+            ? (data as { items: unknown }).items
+            : null;
+        if (cancelled || !Array.isArray(raw)) return;
+        const next: ShopItemRecord[] = [];
+        for (const row of raw) {
+          if (!row || typeof row !== "object") continue;
+          const o = row as Record<string, unknown>;
+          const id = typeof o.id === "string" ? o.id : "";
+          const name = typeof o.name === "string" ? o.name : "";
+          const price = Number(o.price);
+          const iconSrc =
+            typeof o.iconSrc === "string" ? o.iconSrc : DEFAULT_ICON;
+          if (!id || !name || Number.isNaN(price)) continue;
+          next.push({ id, name, price, iconSrc });
+        }
+        if (!cancelled) setItems(cloneRecords(next));
+      } catch {
+        /* 초기 목록 유지 */
       }
-      if (next.length > 0) setItems(next);
-    };
-    socket.on("shop:catalog", onCatalog);
-    const req = () => socket.emit("shop:requestCatalog");
-    if (socket.connected) req();
-    else socket.once("connect", req);
+    })();
     return () => {
-      socket.off("shop:catalog", onCatalog);
+      cancelled = true;
     };
   }, []);
 
@@ -294,28 +294,30 @@ export default function ShopManagePanel() {
     );
   }, [iconPickRowId, items]);
 
-  const save = useCallback(() => {
-    const socket = getSocket();
+  const save = useCallback(async () => {
     setSaving(true);
     setHint("");
-    if (!socket.connected) {
-      setSaving(false);
+    try {
+      const res = await fetch("/api/shop/catalog", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items }),
+      });
+      if (!res.ok) {
+        setHint(SHOP_CATALOG_SAVE_FAIL);
+        return;
+      }
+      setHint(SHOP_CATALOG_SAVE_DONE);
+      window.setTimeout(() => setHint(""), 2200);
+      const socket = getSocket();
+      if (socket.connected) {
+        socket.emit("admin:notifyShopCatalogChanged");
+      }
+    } catch {
       setHint(SHOP_CATALOG_SAVE_FAIL);
-      return;
+    } finally {
+      setSaving(false);
     }
-    socket.emit(
-      "admin:setShopCatalog",
-      { items },
-      (response: { ok?: boolean } | undefined) => {
-        setSaving(false);
-        if (response?.ok) {
-          setHint(SHOP_CATALOG_SAVE_DONE);
-          window.setTimeout(() => setHint(""), 2200);
-        } else {
-          setHint(SHOP_CATALOG_SAVE_FAIL);
-        }
-      },
-    );
   }, [items]);
 
   return (

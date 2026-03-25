@@ -12,7 +12,7 @@ import {
 } from "@/data/copy";
 import styled from "@emotion/styled";
 import { keyframes } from "@emotion/react";
-import { type ShopItemData, pickRandomShopItems } from "./shopItems";
+import { type ShopItemData } from "./shopItems";
 import { getSocket } from "@/app/socketClient";
 
 const letterUnfold = keyframes`
@@ -96,6 +96,16 @@ const LogoWrap = styled.div`
     height: auto;
     display: block;
   }
+`;
+
+const StatusText = styled.p`
+  margin: 0;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.65);
+  font-family: var(--font-pretendard-light), sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  padding: 8px 0 4px;
 `;
 
 const ItemList = styled.ul`
@@ -263,16 +273,19 @@ export type { ShopItemData } from "./shopItems";
 export interface ShopModalCardProps {
   isClosing?: boolean;
   onClose: () => void;
-  /** 미전달 시 화장실 고정 + 나머지 2개 랜덤 */
-  items?: ShopItemData[];
+  /** null 이면 로딩 등 — statusMessage 표시 */
+  items: ShopItemData[] | null;
+  /** 로딩·에러 안내 (있으면 목록 대신 또는 함께 표시) */
+  statusMessage?: string | null;
 }
 
 export default function ShopModalCard({
   isClosing = false,
   onClose,
-  items: itemsProp,
+  items,
+  statusMessage = null,
 }: ShopModalCardProps) {
-  const items = useMemo(() => itemsProp ?? pickRandomShopItems(), [itemsProp]);
+  const listItems = useMemo(() => items ?? [], [items]);
   const [confirmingItem, setConfirmingItem] = useState<ShopItemData | null>(
     null,
   );
@@ -289,30 +302,35 @@ export default function ShopModalCard({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/byte_game_logo.svg" alt={APP_NAME_ALT} />
         </LogoWrap>
-        <ItemList>
-          {items.map((item) => (
-            <ItemRow
-              key={item.id}
-              onClick={() => setConfirmingItem(item)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => e.key === "Enter" && setConfirmingItem(item)}
-            >
-              <IconCircleOuter>
-                <IconCircle>
-                  <IconWrap>{item.icon}</IconWrap>
-                </IconCircle>
-              </IconCircleOuter>
-              <ItemStrip>
-                <ItemName>{item.name}</ItemName>
-                <ItemPrice>
-                  {item.price}
-                  {POINT_SUFFIX}
-                </ItemPrice>
-              </ItemStrip>
-            </ItemRow>
-          ))}
-        </ItemList>
+        {statusMessage ? <StatusText>{statusMessage}</StatusText> : null}
+        {listItems.length > 0 ? (
+          <ItemList>
+            {listItems.map((item) => (
+              <ItemRow
+                key={item.id}
+                onClick={() => setConfirmingItem(item)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) =>
+                  e.key === "Enter" && setConfirmingItem(item)
+                }
+              >
+                <IconCircleOuter>
+                  <IconCircle>
+                    <IconWrap>{item.icon}</IconWrap>
+                  </IconCircle>
+                </IconCircleOuter>
+                <ItemStrip>
+                  <ItemName>{item.name}</ItemName>
+                  <ItemPrice>
+                    {item.price}
+                    {POINT_SUFFIX}
+                  </ItemPrice>
+                </ItemStrip>
+              </ItemRow>
+            ))}
+          </ItemList>
+        ) : null}
       </BoxInner>
       {confirmingItem && (
         <ConfirmOverlay onClick={(e) => e.stopPropagation()}>
@@ -339,6 +357,7 @@ export default function ShopModalCard({
                       const socket = getSocket();
                       socket.emit("team:buyItem", {
                         teamId: currentUser.teamId,
+                        itemId: confirmingItem.id,
                         price: confirmingItem.price,
                       });
                     } catch {

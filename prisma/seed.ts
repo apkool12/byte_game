@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 import { config } from "dotenv";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../app/generated/prisma/client";
+import { DEFAULT_SHOP_CATALOG_RECORDS } from "../data/shopItems";
 
 config({ path: resolve(process.cwd(), ".env") });
 config({ path: resolve(process.cwd(), ".env.local"), override: true });
@@ -66,6 +67,17 @@ async function main() {
   await prisma.user.updateMany({
     where: { id: { in: [...ADMIN_USER_IDS] } },
     data: { isAdmin: true },
+  });
+
+  await prisma.shopItem.deleteMany();
+  await prisma.shopItem.createMany({
+    data: DEFAULT_SHOP_CATALOG_RECORDS.map((row, index) => ({
+      id: row.id,
+      name: row.name,
+      price: row.price,
+      iconSrc: row.iconSrc,
+      sortOrder: index,
+    })),
   });
 }
 

@@ -15,7 +15,8 @@ export const TOILET_ITEM_ID = "toilet";
 /** 상점에 한 번에 노출할 아이템 개수 (화장실 1 + 랜덤 2) */
 export const SHOP_DISPLAY_COUNT = 3;
 
-export const SHOP_ITEM_RECORDS: ShopItemRecord[] = [
+/** DB 시드·초기 카탈로그 기본값 (실제 노출은 API/DB 기준) */
+export const DEFAULT_SHOP_CATALOG_RECORDS: ShopItemRecord[] = [
   { id: "toilet", name: "화장실", price: 500, iconSrc: "/item-toilet.svg" },
   { id: "for-you", name: "너를 위해", price: 500, iconSrc: "/item-score..svg" },
   {
@@ -34,5 +35,5 @@ export const SHOP_ITEM_RECORDS: ShopItemRecord[] = [
 
 /** 어드민·항목 추가에서 고를 수 있는 아이콘 경로 */
 export const SHOP_ITEM_ICON_OPTIONS: string[] = Array.from(
-  new Set(SHOP_ITEM_RECORDS.map((r) => r.iconSrc)),
+  new Set(DEFAULT_SHOP_CATALOG_RECORDS.map((r) => r.iconSrc)),
 ).sort();
