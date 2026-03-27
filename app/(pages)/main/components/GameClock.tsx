@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import styled from "@emotion/styled";
+import { getSocket } from "@/app/socketClient";
 
 const ClockWrap = styled.div`
   position: relative;
@@ -75,36 +76,70 @@ function pad2(n: number) {
 }
 
 export default function GameClock() {
-  const [time, setTime] = useState(() => {
-    const now = new Date();
-    return {
-      h: now.getHours(),
-      m: now.getMinutes(),
-      s: now.getSeconds(),
-    };
-  });
+  const [remainingMs, setRemainingMs] = useState(10 * 60 * 1000);
+  const [running, setRunning] = useState(false);
 
   useEffect(() => {
+    let timerStartAt: number | null = null;
+    let timerDurationMs = 10 * 60 * 1000;
+
+    const socket = getSocket();
+    const onTimerState = (payload: {
+      running?: boolean;
+      startedAt?: number | null;
+      durationMs?: number;
+      remainingMs?: number;
+    }) => {
+      const isRunning = payload?.running === true;
+      setRunning(isRunning);
+      if (!isRunning) {
+        timerStartAt = null;
+        timerDurationMs = payload?.durationMs ?? 10 * 60 * 1000;
+        setRemainingMs(payload?.remainingMs ?? timerDurationMs);
+        return;
+      }
+      timerStartAt =
+        typeof payload?.startedAt === "number" ? payload.startedAt : Date.now();
+      timerDurationMs =
+        typeof payload?.durationMs === "number"
+          ? payload.durationMs
+          : 10 * 60 * 1000;
+      const nextRemaining =
+        typeof payload?.remainingMs === "number"
+          ? payload.remainingMs
+          : Math.max(0, timerDurationMs - (Date.now() - timerStartAt));
+      setRemainingMs(nextRemaining);
+    };
+
+    socket.on("shop:refreshTimerState", onTimerState);
+    socket.emit("shop:requestRefreshTimerState");
+
     const id = setInterval(() => {
-      const now = new Date();
-      setTime({
-        h: now.getHours(),
-        m: now.getMinutes(),
-        s: now.getSeconds(),
-      });
+      if (!timerStartAt) return;
+      const next = Math.max(0, timerDurationMs - (Date.now() - timerStartAt));
+      setRemainingMs(next);
     }, 1000);
-    return () => clearInterval(id);
+
+    return () => {
+      socket.off("shop:refreshTimerState", onTimerState);
+      clearInterval(id);
+    };
   }, []);
+
+  const totalSeconds = Math.ceil(remainingMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  const hours = running ? 0 : 0;
 
   return (
     <ClockWrap>
       <ClockLine />
       <ClockInner>
-        <DigitBlock>{pad2(time.h)}</DigitBlock>
+        <DigitBlock>{pad2(hours)}</DigitBlock>
         <Separator aria-hidden />
-        <DigitBlock>{pad2(time.m)}</DigitBlock>
+        <DigitBlock>{pad2(minutes)}</DigitBlock>
         <Separator aria-hidden />
-        <DigitBlock>{pad2(time.s)}</DigitBlock>
+        <DigitBlock>{pad2(seconds)}</DigitBlock>
       </ClockInner>
     </ClockWrap>
   );

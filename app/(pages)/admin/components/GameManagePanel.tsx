@@ -18,9 +18,11 @@ import {
 } from "@/data/adminGames";
 import {
   ADMIN_GAME_SAVE_DONE,
+  ADMIN_GAME_TIMER_STARTED,
   ARIA_ADMIN_GAME_DEC,
   ARIA_ADMIN_GAME_INC,
   BTN_ADMIN_GAME_SAVE,
+  BTN_ADMIN_GAME_TIMER_START,
   BTN_OPEN_GAME_SELECT_MODAL,
   BTN_OPEN_RANK_RULES_MODAL,
   LABEL_ADMIN_GAME_RANK_RULES,
@@ -31,6 +33,7 @@ import {
 import styled from "@emotion/styled";
 import GameRankRulesModal from "./GameRankRulesModal";
 import GameSelectModal from "./GameSelectModal";
+import { getSocket } from "@/app/socketClient";
 
 const Wrap = styled.div`
   width: 100%;
@@ -239,6 +242,23 @@ export default function GameManagePanel() {
     window.setTimeout(() => setHint(""), 2000);
   }, [staffTeam, roomNumber, gameId, rules]);
 
+  const startShopTimer = useCallback(() => {
+    const session: AdminGameSession = {
+      staffTeamNumber: staffTeam,
+      roomNumber,
+      gameId,
+      rankPenaltiesByGameId: rules,
+    };
+    saveAdminGameSession(session);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event(ADMIN_GAME_SESSION_EVENT));
+    }
+    const socket = getSocket();
+    socket.emit("admin:startShopRefreshTimer");
+    setHint(ADMIN_GAME_TIMER_STARTED);
+    window.setTimeout(() => setHint(""), 2000);
+  }, [staffTeam, roomNumber, gameId, rules]);
+
   const selectedGameLabel = getGameEntryById(gameId)?.label ?? "";
 
   return (
@@ -304,6 +324,9 @@ export default function GameManagePanel() {
 
       <SaveBtn type="button" onClick={save}>
         {BTN_ADMIN_GAME_SAVE}
+      </SaveBtn>
+      <SaveBtn type="button" onClick={startShopTimer}>
+        {BTN_ADMIN_GAME_TIMER_START}
       </SaveBtn>
       <SaveHint>{hint}</SaveHint>
 

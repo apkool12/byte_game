@@ -38,6 +38,9 @@ function getAppBaseUrl() {
 
 const CATALOG_TTL_MS = 60_000;
 let catalogCache = { items: null, at: 0 };
+const SHOP_REFRESH_INTERVAL_MS = 10 * 60 * 1000;
+let shopRefreshStartedAt = null;
+let shopRefreshTimer = null;
 
 async function fetchShopCatalogFromApi() {
   const base = getAppBaseUrl();
@@ -71,6 +74,50 @@ async function getCatalogItemsCached() {
   return items;
 }
 
+function getShopRefreshTimerState() {
+  if (!shopRefreshStartedAt) {
+    return {
+      running: false,
+      startedAt: null,
+      durationMs: SHOP_REFRESH_INTERVAL_MS,
+      remainingMs: SHOP_REFRESH_INTERVAL_MS,
+    };
+  }
+  const elapsed = Date.now() - shopRefreshStartedAt;
+  const remaining = Math.max(0, SHOP_REFRESH_INTERVAL_MS - elapsed);
+  return {
+    running: true,
+    startedAt: shopRefreshStartedAt,
+    durationMs: SHOP_REFRESH_INTERVAL_MS,
+    remainingMs: remaining,
+  };
+}
+
+function emitShopRefreshTimerState(target) {
+  target.emit("shop:refreshTimerState", getShopRefreshTimerState());
+}
+
+function clearShopRefreshTimer() {
+  if (shopRefreshTimer) {
+    clearInterval(shopRefreshTimer);
+    shopRefreshTimer = null;
+  }
+}
+
+function startShopRefreshTimer() {
+  clearShopRefreshTimer();
+  shopRefreshStartedAt = Date.now();
+  emitShopRefreshTimerState(io);
+  shopRefreshTimer = setInterval(() => {
+    // 10분마다 상점 카탈로그를 다시 읽게 트리거
+    catalogCache = { items: null, at: 0 };
+    io.emit("shop:catalogChanged");
+    // 다음 10분 주기를 시작한 것으로 카운트다운 리셋
+    shopRefreshStartedAt = Date.now();
+    emitShopRefreshTimerState(io);
+  }, SHOP_REFRESH_INTERVAL_MS);
+}
+
 /** 메모리 상의 조별 점수 (서버 기준 진실 데이터) */
 const teamPoints = {
   "team-1": 1000,
@@ -94,6 +141,7 @@ const io = new Server(httpServer, {
 io.on("connection", (socket) => {
   // 클라이언트가 접속하면 현재 전체 점수 한 번 내려주기 (선택 사항)
   socket.emit("team:allScores", teamPoints);
+  emitShopRefreshTimerState(socket);
 
   // 어드민 등에서 나중에 연결된 화면이 현재 점수를 요청할 때
   socket.on("team:requestAllScores", () => {
@@ -103,6 +151,14 @@ io.on("connection", (socket) => {
   socket.on("admin:notifyShopCatalogChanged", () => {
     catalogCache = { items: null, at: 0 };
     io.emit("shop:catalogChanged");
+  });
+
+  socket.on("shop:requestRefreshTimerState", () => {
+    emitShopRefreshTimerState(socket);
+  });
+
+  socket.on("admin:startShopRefreshTimer", () => {
+    startShopRefreshTimer();
   });
 
   // 상점에서 구매 요청 (itemId 있으면 Next API 카탈로그로 가격 검증)
