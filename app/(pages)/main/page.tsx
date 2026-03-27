@@ -175,7 +175,9 @@ export default function MainPage() {
 
   const loadShopCatalog = useCallback(async () => {
     try {
-      const res = await fetch("/api/shop/catalog");
+      const res = await fetch(`/api/shop/catalog?t=${Date.now()}`, {
+        cache: "no-store",
+      });
       if (!res.ok) {
         setShopCatalog([]);
         setShopCatalogError(true);
@@ -248,9 +250,17 @@ export default function MainPage() {
     const onCatalogChanged = () => {
       void loadShopCatalog();
     };
+    const onConnect = () => {
+      void loadShopCatalog();
+    };
     socket.on("shop:catalogChanged", onCatalogChanged);
+    socket.on("connect", onConnect);
+    if (socket.connected) {
+      void loadShopCatalog();
+    }
     return () => {
       socket.off("shop:catalogChanged", onCatalogChanged);
+      socket.off("connect", onConnect);
     };
   }, [mounted, loadShopCatalog]);
 

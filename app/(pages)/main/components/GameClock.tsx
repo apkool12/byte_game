@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import styled from "@emotion/styled";
 import { getSocket } from "@/app/socketClient";
 
@@ -77,12 +77,10 @@ function pad2(n: number) {
 
 export default function GameClock() {
   const [remainingMs, setRemainingMs] = useState(10 * 60 * 1000);
-  const [running, setRunning] = useState(false);
+  const timerStartAtRef = useRef<number | null>(null);
+  const timerDurationMsRef = useRef(10 * 60 * 1000);
 
   useEffect(() => {
-    let timerStartAt: number | null = null;
-    let timerDurationMs = 10 * 60 * 1000;
-
     const socket = getSocket();
     const onTimerState = (payload: {
       running?: boolean;
@@ -91,45 +89,61 @@ export default function GameClock() {
       remainingMs?: number;
     }) => {
       const isRunning = payload?.running === true;
-      setRunning(isRunning);
       if (!isRunning) {
-        timerStartAt = null;
-        timerDurationMs = payload?.durationMs ?? 10 * 60 * 1000;
-        setRemainingMs(payload?.remainingMs ?? timerDurationMs);
+        timerStartAtRef.current = null;
+        timerDurationMsRef.current = payload?.durationMs ?? 10 * 60 * 1000;
+        setRemainingMs(payload?.remainingMs ?? timerDurationMsRef.current);
         return;
       }
-      timerStartAt =
+      const startedAt =
         typeof payload?.startedAt === "number" ? payload.startedAt : Date.now();
-      timerDurationMs =
+      timerStartAtRef.current = startedAt;
+      timerDurationMsRef.current =
         typeof payload?.durationMs === "number"
           ? payload.durationMs
           : 10 * 60 * 1000;
       const nextRemaining =
         typeof payload?.remainingMs === "number"
           ? payload.remainingMs
-          : Math.max(0, timerDurationMs - (Date.now() - timerStartAt));
+          : Math.max(
+              0,
+              timerDurationMsRef.current - (Date.now() - startedAt),
+            );
       setRemainingMs(nextRemaining);
     };
 
+    const requestTimerState = () => {
+      socket.emit("shop:requestRefreshTimerState");
+    };
+
     socket.on("shop:refreshTimerState", onTimerState);
-    socket.emit("shop:requestRefreshTimerState");
+    // 연결 전에 emit 하면 상태를 못 받는 경우가 있어 connect 이후에도 요청
+    socket.on("connect", requestTimerState);
+    if (socket.connected) {
+      requestTimerState();
+    }
 
     const id = setInterval(() => {
-      if (!timerStartAt) return;
-      const next = Math.max(0, timerDurationMs - (Date.now() - timerStartAt));
+      const startAt = timerStartAtRef.current;
+      if (startAt == null) return;
+      const next = Math.max(
+        0,
+        timerDurationMsRef.current - (Date.now() - startAt),
+      );
       setRemainingMs(next);
     }, 1000);
 
     return () => {
       socket.off("shop:refreshTimerState", onTimerState);
+      socket.off("connect", requestTimerState);
       clearInterval(id);
     };
   }, []);
 
   const totalSeconds = Math.ceil(remainingMs / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
-  const hours = running ? 0 : 0;
 
   return (
     <ClockWrap>

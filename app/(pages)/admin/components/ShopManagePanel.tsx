@@ -310,9 +310,7 @@ export default function ShopManagePanel() {
       setHint(SHOP_CATALOG_SAVE_DONE);
       window.setTimeout(() => setHint(""), 2200);
       const socket = getSocket();
-      if (socket.connected) {
-        socket.emit("admin:notifyShopCatalogChanged");
-      }
+      socket.emit("admin:notifyShopCatalogChanged");
     } catch {
       setHint(SHOP_CATALOG_SAVE_FAIL);
     } finally {
