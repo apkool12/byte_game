@@ -75,9 +75,10 @@ async function getCatalogItemsCached() {
 }
 
 function getShopRefreshTimerState() {
+  // 서버 기동 후에는 항상 돌아가는 10분 주기 (startedAt 없으면 곧 init 됨)
   if (!shopRefreshStartedAt) {
     return {
-      running: false,
+      running: true,
       startedAt: null,
       durationMs: SHOP_REFRESH_INTERVAL_MS,
       remainingMs: SHOP_REFRESH_INTERVAL_MS,
@@ -104,6 +105,7 @@ function clearShopRefreshTimer() {
   }
 }
 
+/** 서버 부팅 시 자동 시작 + 어드민 "타이머 시작" 시 주기 초기화(리셋) */
 function startShopRefreshTimer() {
   clearShopRefreshTimer();
   shopRefreshStartedAt = Date.now();
@@ -157,8 +159,12 @@ io.on("connection", (socket) => {
     emitShopRefreshTimerState(socket);
   });
 
-  socket.on("admin:startShopRefreshTimer", () => {
+  // 어드민: 타이머 시작 = 10분 주기를 지금부터 다시 시작(초기화)
+  socket.on("admin:startShopRefreshTimer", (_, ack) => {
     startShopRefreshTimer();
+    if (typeof ack === "function") {
+      ack({ ok: true, state: getShopRefreshTimerState() });
+    }
   });
 
   // 상점에서 구매 요청 (itemId 있으면 Next API 카탈로그로 가격 검증)
@@ -291,6 +297,9 @@ io.on("connection", (socket) => {
     }
   });
 });
+
+// 서버 시작 시 10분 상점 리프레시 타이머 자동 가동 (어드민 버튼은 이 주기를 초기화)
+startShopRefreshTimer();
 
 httpServer.listen(PORT, () => {
   console.log(`[socket] Byte Game server listening on port ${PORT}`);

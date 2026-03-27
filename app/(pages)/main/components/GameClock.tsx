@@ -95,25 +95,35 @@ export default function GameClock() {
         setRemainingMs(payload?.remainingMs ?? timerDurationMsRef.current);
         return;
       }
-      const startedAt =
-        typeof payload?.startedAt === "number" ? payload.startedAt : Date.now();
-      timerStartAtRef.current = startedAt;
       timerDurationMsRef.current =
         typeof payload?.durationMs === "number"
           ? payload.durationMs
           : 10 * 60 * 1000;
-      const nextRemaining =
+      const duration = timerDurationMsRef.current;
+      const remFromServer =
         typeof payload?.remainingMs === "number"
           ? payload.remainingMs
-          : Math.max(
-              0,
-              timerDurationMsRef.current - (Date.now() - startedAt),
-            );
+          : undefined;
+      if (typeof payload?.startedAt === "number") {
+        timerStartAtRef.current = payload.startedAt;
+      } else {
+        // startedAt 없을 때는 서버 remaining으로 역산 (부팅 직후 등)
+        const rem = remFromServer ?? duration;
+        timerStartAtRef.current = Date.now() - (duration - rem);
+      }
+      const nextRemaining =
+        remFromServer ??
+        Math.max(
+          0,
+          duration - (Date.now() - (timerStartAtRef.current ?? Date.now())),
+        );
       setRemainingMs(nextRemaining);
     };
 
     const requestTimerState = () => {
-      socket.emit("shop:requestRefreshTimerState");
+      if (socket.connected) {
+        socket.emit("shop:requestRefreshTimerState");
+      }
     };
 
     socket.on("shop:refreshTimerState", onTimerState);
@@ -133,10 +143,16 @@ export default function GameClock() {
       setRemainingMs(next);
     }, 1000);
 
+    // 이벤트 누락 대비: 주기적으로 서버 상태 재동기화
+    const syncId = setInterval(() => {
+      requestTimerState();
+    }, 5000);
+
     return () => {
       socket.off("shop:refreshTimerState", onTimerState);
       socket.off("connect", requestTimerState);
       clearInterval(id);
+      clearInterval(syncId);
     };
   }, []);
 

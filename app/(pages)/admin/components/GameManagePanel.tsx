@@ -18,6 +18,7 @@ import {
 } from "@/data/adminGames";
 import {
   ADMIN_GAME_SAVE_DONE,
+  ADMIN_GAME_TIMER_START_FAIL,
   ADMIN_GAME_TIMER_STARTED,
   ARIA_ADMIN_GAME_DEC,
   ARIA_ADMIN_GAME_INC,
@@ -254,9 +255,24 @@ export default function GameManagePanel() {
       window.dispatchEvent(new Event(ADMIN_GAME_SESSION_EVENT));
     }
     const socket = getSocket();
-    socket.emit("admin:startShopRefreshTimer");
-    setHint(ADMIN_GAME_TIMER_STARTED);
-    window.setTimeout(() => setHint(""), 2000);
+    const onStartResult = (response: { ok?: boolean } | undefined) => {
+      if (response?.ok) {
+        setHint(ADMIN_GAME_TIMER_STARTED);
+      } else {
+        setHint(ADMIN_GAME_TIMER_START_FAIL);
+      }
+      window.setTimeout(() => setHint(""), 2000);
+    };
+    if (socket.connected) {
+      socket.emit("admin:startShopRefreshTimer", null, onStartResult);
+      return;
+    }
+    // 연결 지연 시 시작 요청을 connect 후 1회 재시도
+    const onConnect = () => {
+      socket.emit("admin:startShopRefreshTimer", null, onStartResult);
+      socket.off("connect", onConnect);
+    };
+    socket.on("connect", onConnect);
   }, [staffTeam, roomNumber, gameId, rules]);
 
   const selectedGameLabel = getGameEntryById(gameId)?.label ?? "";

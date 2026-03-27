@@ -88,7 +88,9 @@ export const LABEL_ADMIN_GAME_TYPE = "진행 게임";
 export const BTN_ADMIN_GAME_SAVE = "저장";
 export const BTN_ADMIN_GAME_TIMER_START = "타이머 시작";
 export const ADMIN_GAME_SAVE_DONE = "저장되었습니다.";
-export const ADMIN_GAME_TIMER_STARTED = "10분 상점 타이머가 시작되었습니다.";
+export const ADMIN_GAME_TIMER_STARTED = "10분 타이머가 초기화되었습니다.";
+export const ADMIN_GAME_TIMER_START_FAIL =
+  "타이머 시작에 실패했습니다. 소켓 연결을 확인해 주세요.";
 export const ARIA_ADMIN_GAME_DEC = "한 단계 감소";
 export const ARIA_ADMIN_GAME_INC = "한 단계 증가";
 export const LABEL_ADMIN_GAME_RANK_RULES = "순위별 점수 (선택한 게임)";
