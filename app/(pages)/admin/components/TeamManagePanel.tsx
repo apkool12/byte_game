@@ -15,6 +15,10 @@ import {
   GAME_ALL_TITLE,
   GAME_ALL_INCREASE,
   GAME_ALL_DECREASE,
+  HINT_GAME_TEAM_BY_ROOM,
+  HINT_GAME_ROOM_SESSION_REQUIRED,
+  GAME_ROOM_EMPTY,
+  TEAM_LABEL_STAFF,
   TEAM_SELECT_LABEL,
   TEAM_SELECT_BTN,
   TEAM_SELECT_PREV,
@@ -29,6 +33,7 @@ import { getCurrentUser } from "@/data/currentUser";
 import { getSocket } from "@/app/socketClient";
 import {
   ADMIN_GAME_SESSION_EVENT,
+  getStoredAdminGameSession,
   getActiveGameRankPenalties,
 } from "@/data/adminGames";
 import type { ScoreChangeLogEntry } from "@/types/socket";
@@ -38,6 +43,44 @@ import ScoreAdjustModal from "./ScoreAdjustModal";
 
 const MIN_TEAM = 1;
 const MAX_TEAM = 10;
+
+/** 참가 번호(no) 문자열을 숫자로 비교 (같은 방·같은 조에 여러 명일 때 가장 작은 번호 우선) */
+function parseParticipantNo(no: string | undefined): number {
+  if (no == null || no === "") return Number.MAX_SAFE_INTEGER;
+  const digits = String(no).replace(/\D/g, "");
+  const n = parseInt(digits, 10);
+  return Number.isNaN(n) ? Number.MAX_SAFE_INTEGER : n;
+}
+
+/** 순위/전체 적용용: 1~10조(teamId)만 */
+function extractGameTeamNumber(teamId: string): number | null {
+  const m = /^team-(\d+)$/.exec(teamId);
+  if (!m) return null;
+  const n = Number(m[1]);
+  if (n < MIN_TEAM || n > MAX_TEAM) return null;
+  return n;
+}
+
+/** 게임 방 화면: roomId로만 묶어서 인원 전부 (대표 선정 없음) */
+function listUsersInRoom(
+  users: PublicUser[],
+  roomId: string | null,
+): PublicUser[] {
+  if (!roomId) return [];
+  return [...users]
+    .filter((u) => u.roomId === roomId)
+    .sort((a, b) => {
+      const d = parseParticipantNo(a.no) - parseParticipantNo(b.no);
+      if (d !== 0) return d;
+      return a.id.localeCompare(b.id);
+    });
+}
+
+function teamLabelFromUser(u: PublicUser): string {
+  if (u.teamId === "team-0") return TEAM_LABEL_STAFF;
+  const t = getTeamById(u.teamId);
+  return t?.name ?? u.teamId;
+}
 
 const Wrap = styled.div`
   width: 100%;
@@ -355,6 +398,28 @@ const GameManageWrap = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
+`;
+
+const GameRoomHint = styled.p`
+  margin: 0 0 12px;
+  padding: 0 8px;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: center;
+  font-size: 11px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.45);
+  font-family: var(--font-pretendard-light), sans-serif;
+`;
+
+const GameRoomEmpty = styled.p`
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 24px 12px;
+  text-align: center;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.5);
+  font-family: var(--font-pretendard-light), sans-serif;
 `;
 
 const GameGrid = styled.div`
@@ -724,6 +789,15 @@ export default function TeamManagePanel({
   const lastFetchedPageRef = useRef(-1);
   const [publicUsers, setPublicUsers] = useState<PublicUser[]>([]);
 
+  // 현재 어드민 설정(방 번호)에 맞춰서 game 조를 "roomId" 기준으로 매칭한다.
+  // - GameManagePanel에서 저장한 `byte-game-admin-game-session`을 읽는다.
+  // - 방 변경 시점에는 ADMIN_GAME_SESSION_EVENT / storage 이벤트로 rerender가 일어난다.
+  const activeRoomId = (() => {
+    const session = getStoredAdminGameSession();
+    if (!session) return null;
+    return `room-${session.roomNumber}`;
+  })();
+
   useEffect(() => {
     let cancelled = false;
     fetch("/api/users")
@@ -940,22 +1014,26 @@ export default function TeamManagePanel({
   const team = getTeamById(teamId);
   const liveScore =
     teamId in teamScores ? teamScores[teamId] : (team?.points ?? 0);
-  const gameTeamRows = Array.from({ length: MAX_TEAM }, (_, idx) => {
-    const teamNumber = idx + 1;
-    const matchedUser = publicUsers.find(
-      (u) => u.teamId === `team-${teamNumber}`,
-    );
-    const teamScoreValue =
-      teamScores[`team-${teamNumber}`] ?? getTeamById(`team-${teamNumber}`)?.points;
-    const isAdjustable = matchedUser != null && teamScoreValue != null;
-    return {
-      teamNumber,
-      name: matchedUser?.name ?? "-",
-      no: matchedUser?.no ?? "---",
-      roomId: matchedUser?.roomId ?? `room-${((teamNumber - 1) % 9) + 1}`,
-      isAdjustable,
-    };
-  });
+
+  const usersInRoom = useMemo(
+    () => listUsersInRoom(publicUsers, activeRoomId),
+    [publicUsers, activeRoomId],
+  );
+
+  /** 순위/전체 적용: 방에 그 조 소속이 한 명이라도 있으면 해당 teamId로 조정 가능 */
+  const rankTeamOptions = useMemo(() => {
+    return Array.from({ length: MAX_TEAM }, (_, idx) => {
+      const teamNumber = idx + 1;
+      const hasMemberInRoom = usersInRoom.some(
+        (u) => extractGameTeamNumber(u.teamId) === teamNumber,
+      );
+      const teamScoreValue =
+        teamScores[`team-${teamNumber}`] ??
+        getTeamById(`team-${teamNumber}`)?.points;
+      const isAdjustable = hasMemberInRoom && teamScoreValue != null;
+      return { teamNumber, isAdjustable };
+    });
+  }, [usersInRoom, teamScores]);
   const rankPenaltyByPlace = useMemo(
     () => getActiveGameRankPenalties(),
     [rankPenaltyRev],
@@ -970,14 +1048,14 @@ export default function TeamManagePanel({
 
   const applyRankPenalty = useCallback(() => {
     const scoreDeltaByTeam = new Map<string, number>();
-    const gameRowByTeamNumber = new Map(
-      gameTeamRows.map((row) => [row.teamNumber, row]),
+    const optionByTeamNumber = new Map(
+      rankTeamOptions.map((row) => [row.teamNumber, row]),
     );
     rankTeamByPlace.forEach((teamNumber, idx) => {
       const place = idx + 1;
       const delta = getPenaltyByPlace(place);
       if (delta === 0) return;
-      const row = gameRowByTeamNumber.get(teamNumber);
+      const row = optionByTeamNumber.get(teamNumber);
       if (!row?.isAdjustable) return;
       const teamKey = `team-${teamNumber}`;
       scoreDeltaByTeam.set(teamKey, (scoreDeltaByTeam.get(teamKey) ?? 0) + delta);
@@ -997,7 +1075,7 @@ export default function TeamManagePanel({
       });
     });
     setView("gameManage");
-  }, [gameTeamRows, getPenaltyByPlace, rankTeamByPlace]);
+  }, [rankTeamOptions, getPenaltyByPlace, rankTeamByPlace]);
 
   const applyAllPenalty = useCallback(() => {
     if (allAdjustAmount <= 0) {
@@ -1007,9 +1085,13 @@ export default function TeamManagePanel({
     }
     const signedDelta =
       allAdjustMode === "increase" ? allAdjustAmount : -allAdjustAmount;
-    const targetTeamIds = gameTeamRows
-      .filter((row) => row.isAdjustable)
-      .map((row) => `team-${row.teamNumber}`);
+    const targetTeamIds = [
+      ...new Set(
+        rankTeamOptions
+          .filter((row) => row.isAdjustable)
+          .map((row) => `team-${row.teamNumber}`),
+      ),
+    ];
     if (targetTeamIds.length === 0) {
       setView("gameManage");
       return;
@@ -1031,7 +1113,7 @@ export default function TeamManagePanel({
         setView("gameManage");
       },
     );
-  }, [allAdjustAmount, allAdjustMode, gameTeamRows]);
+  }, [allAdjustAmount, allAdjustMode, rankTeamOptions]);
 
   if (view === "showLog") {
     return (
@@ -1179,22 +1261,31 @@ export default function TeamManagePanel({
   if (view === "gameManage") {
     return (
       <GameManageWrap>
+        <GameRoomHint>
+          {!activeRoomId
+            ? HINT_GAME_ROOM_SESSION_REQUIRED
+            : HINT_GAME_TEAM_BY_ROOM}
+        </GameRoomHint>
         <GameGrid>
-          {gameTeamRows.map((row) => (
-            <GameTeamCard type="button" key={row.teamNumber}>
-              <GameAvatar aria-hidden>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/header-user.png" alt="" />
-              </GameAvatar>
-              <GameCardBody>
-                <GameNameRow>
-                  {row.name}
-                  <GameTeamText>{`${row.teamNumber}조`}</GameTeamText>
-                </GameNameRow>
-                <GameNoBadge>{`No.${row.no}`}</GameNoBadge>
-              </GameCardBody>
-            </GameTeamCard>
-          ))}
+          {activeRoomId && usersInRoom.length === 0 ? (
+            <GameRoomEmpty>{GAME_ROOM_EMPTY}</GameRoomEmpty>
+          ) : (
+            usersInRoom.map((u) => (
+              <GameTeamCard type="button" key={u.id}>
+                <GameAvatar aria-hidden>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/header-user.png" alt="" />
+                </GameAvatar>
+                <GameCardBody>
+                  <GameNameRow>
+                    {u.name}
+                    <GameTeamText>{teamLabelFromUser(u)}</GameTeamText>
+                  </GameNameRow>
+                  <GameNoBadge>{`No.${u.no ?? "-"}`}</GameNoBadge>
+                </GameCardBody>
+              </GameTeamCard>
+            ))
+          )}
         </GameGrid>
         <GameBottomRow>
           <GameBottomButton type="button" onClick={() => setView("rankManage")}>
@@ -1263,6 +1354,11 @@ export default function TeamManagePanel({
   if (view === "rankManage") {
     return (
       <RankManageWrap>
+        <GameRoomHint>
+          {!activeRoomId
+            ? HINT_GAME_ROOM_SESSION_REQUIRED
+            : HINT_GAME_TEAM_BY_ROOM}
+        </GameRoomHint>
         <RankTitle>{GAME_RANK_TITLE}</RankTitle>
         {Array.from({ length: 10 }, (_, idx) => {
           const place = idx + 1;
@@ -1287,11 +1383,11 @@ export default function TeamManagePanel({
                   });
                 }}
               >
-                {gameTeamRows.map((row) => {
+                {rankTeamOptions.map((row) => {
                   const teamNo = row.teamNumber;
                   return (
                     <option key={teamNo} value={teamNo} disabled={!row.isAdjustable}>
-                      {`${teamNo}조-${row.name}`}
+                      {`${teamNo}조`}
                     </option>
                   );
                 })}

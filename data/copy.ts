@@ -102,5 +102,13 @@ export const GAME_SELECT_MODAL_TITLE = "진행 게임 선택";
 export const BTN_OPEN_GAME_SELECT_MODAL = "진행 게임 선택";
 export const ARIA_GAME_SELECT_MODAL = "진행 게임 선택";
 
+/** 게임 방: 선택한 roomId에 속한 인원 전체 표시 */
+export const HINT_GAME_TEAM_BY_ROOM =
+  "목록은 GAME MANAGE에서 저장한 방(roomId)에 속한 인원 전부입니다. (순위·점수 적용은 각 사람의 소속 조 teamId 기준)";
+export const HINT_GAME_ROOM_SESSION_REQUIRED =
+  "먼저 GAME MANAGE에서 방 번호를 저장해 주세요.";
+export const GAME_ROOM_EMPTY = "이 방에 등록된 인원이 없습니다.";
+export const TEAM_LABEL_STAFF = "스태프";
+
 /** 공통 */
 export const ARIA_CLOSE = "닫기";
