@@ -25,6 +25,20 @@ const CUPRAMEN_ITEM_ID = "cupramen";
 const CUPRAMEN_INITIAL_STOCK = 48;
 let cupramenStockRemaining = CUPRAMEN_INITIAL_STOCK;
 
+function normalizeTeamId(rawTeamId) {
+  if (typeof rawTeamId !== "string") return null;
+  const trimmed = rawTeamId.trim();
+  if (!trimmed) return null;
+  if (trimmed in teamPoints) return trimmed;
+
+  const numeric = trimmed.replace(/^team-?/i, "");
+  if (/^\d+$/.test(numeric)) {
+    const canonical = `team-${Number(numeric)}`;
+    if (canonical in teamPoints) return canonical;
+  }
+  return null;
+}
+
 function addScoreLog(entry) {
   scoreChangeLogs.unshift(entry);
   if (scoreChangeLogs.length > MAX_LOGS) scoreChangeLogs.pop();
@@ -216,7 +230,8 @@ io.on("connection", (socket) => {
       if (typeof ack === "function") ack(result);
     };
     try {
-      const { teamId, itemId, price, buyerName } = payload || {};
+      const { teamId: rawTeamId, itemId, price, buyerName } = payload || {};
+      const teamId = normalizeTeamId(rawTeamId);
       if (!teamId) {
         reply({ ok: false, reason: "bad_request" });
         return;
@@ -290,7 +305,8 @@ io.on("connection", (socket) => {
   // 어드민 점수 증감 (delta: 양수=증가, 음수=차감)
   socket.on("admin:adjustScore", (payload, ack) => {
     try {
-      const { teamId, delta: deltaRaw, processorName } = payload || {};
+      const { teamId: rawTeamId, delta: deltaRaw, processorName } = payload || {};
+      const teamId = normalizeTeamId(rawTeamId);
       if (!teamId) {
         if (typeof ack === "function") ack({ ok: false });
         return;
@@ -337,7 +353,7 @@ io.on("connection", (socket) => {
       }
 
       const targetIds = Array.isArray(targetTeamIds)
-        ? targetTeamIds
+        ? targetTeamIds.map(normalizeTeamId).filter(Boolean)
         : Object.keys(teamPoints);
 
       let adjustedCount = 0;
