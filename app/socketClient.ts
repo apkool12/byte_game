@@ -1,21 +1,22 @@
 "use client";
 
+import { DEFAULT_PUBLIC_SOCKET_URL } from "@/data/socketConfig";
 import { io, type Socket } from "socket.io-client";
 
 let socket: Socket | null = null;
-let didFallbackToLocalhost = false;
+let didFallbackFromNgrok = false;
 
 const isNgrokUrl = (url: string) =>
   /ngrok-free\.app|ngrok\.io|ngrok\.dev/i.test(url);
 
 /**
- * ngrok 사용 시: .env.local 에 NEXT_PUBLIC_SOCKET_URL=https://xxxx.ngrok-free.app
- * ngrok start --all (설정에 web 3000, socket 4000 터널) 후 socket 쪽 URL 사용
+ * 기본 소켓 URL은 `data/socketConfig.ts` 의 `DEFAULT_PUBLIC_SOCKET_URL` (운영: https://바이트엠티.서버.한국).
+ * 로컬 전용 소켓을 쓸 때만 `NEXT_PUBLIC_SOCKET_URL=http://localhost:4000` 등으로 덮어쓴다.
  */
 export function getSocket(): Socket {
   if (!socket) {
     const primaryUrl =
-      process.env.NEXT_PUBLIC_SOCKET_URL ?? "http://localhost:4000";
+      process.env.NEXT_PUBLIC_SOCKET_URL ?? DEFAULT_PUBLIC_SOCKET_URL;
     const createOptions = (url: string): Parameters<typeof io>[1] => {
       const options: Parameters<typeof io>[1] = {
         transports: ["polling", "websocket"],
@@ -25,29 +26,35 @@ export function getSocket(): Socket {
       }
       return options;
     };
+    const devLog = (...args: unknown[]) => {
+      if (process.env.NODE_ENV === "development") {
+        // eslint-disable-next-line no-console -- 로컬에서만 소켓 디버그
+        console.log(...args);
+      }
+    };
     const connectSocket = (url: string) => {
-      console.log("[socket] 연결 확인 중...", url);
+      devLog("[socket] 연결 확인 중...", url);
       socket = io(url, createOptions(url));
       socket.on("connect", () => {
-        console.log("[socket] 연결 확인: 연결됨 (새로고침 후 확인)", url);
+        devLog("[socket] 연결 확인: 연결됨", url);
       });
       socket.on("disconnect", (reason) => {
-        console.log("[socket] 연결 끊김", reason);
+        devLog("[socket] 연결 끊김", reason);
       });
       socket.on("connect_error", (err) => {
-        console.log("[socket] 연결 실패", err.message);
+        devLog("[socket] 연결 실패", err.message);
         const canFallback =
           isNgrokUrl(url) &&
-          !didFallbackToLocalhost &&
+          !didFallbackFromNgrok &&
           typeof window !== "undefined" &&
           (window.location.hostname === "localhost" ||
             window.location.hostname === "127.0.0.1");
         if (canFallback) {
-          didFallbackToLocalhost = true;
-          console.log("[socket] ngrok 실패 → localhost:4000 폴백");
+          didFallbackFromNgrok = true;
+          devLog("[socket] ngrok 실패 → 운영 소켓 URL 폴백");
           socket?.removeAllListeners();
           socket?.disconnect();
-          connectSocket("http://localhost:4000");
+          connectSocket(DEFAULT_PUBLIC_SOCKET_URL);
         }
       });
     };
@@ -58,4 +65,3 @@ export function getSocket(): Socket {
   }
   return socket;
 }
-

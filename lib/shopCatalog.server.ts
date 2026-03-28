@@ -5,12 +5,12 @@ import {
   DEFAULT_SHOP_CATALOG_RECORDS,
   EXCLUDED_SHOP_ITEM_IDS,
 } from "@/data/shopItems";
+import { getPrisma } from "@/lib/prisma";
 
 function filterExcludedCatalogItems(items: ShopItemRecord[]): ShopItemRecord[] {
   const banned = new Set<string>(EXCLUDED_SHOP_ITEM_IDS);
   return items.filter((r) => !banned.has(r.id));
 }
-import { getPrisma } from "@/lib/prisma";
 
 export function normalizeShopItemInput(raw: unknown): ShopItemRecord | null {
   if (!raw || typeof raw !== "object") return null;

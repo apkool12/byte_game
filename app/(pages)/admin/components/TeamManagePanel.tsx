@@ -929,12 +929,16 @@ export default function TeamManagePanel({
   }, [view, onViewChange]);
 
   const logsLoadingRef = useRef(false);
+  /** 로그 뷰·탭·필터가 바뀌면 증가 — 직전 요청 응답은 무시 (빈 목록·로딩 멈춤 방지) */
+  const logSessionRef = useRef(0);
   const fetchLogs = useCallback((page: number, append: boolean) => {
     if (logsLoadingRef.current) return;
     logsLoadingRef.current = true;
     setLogsLoading(true);
     const socket = getSocket();
+    const sessionAtFetch = logSessionRef.current;
     const timeout = setTimeout(() => {
+      if (sessionAtFetch !== logSessionRef.current) return;
       if (logsLoadingRef.current) {
         logsLoadingRef.current = false;
         setLogsLoading(false);
@@ -945,6 +949,7 @@ export default function TeamManagePanel({
       hasMore: boolean;
       page: number;
     }) => {
+      if (sessionAtFetch !== logSessionRef.current) return;
       clearTimeout(timeout);
       setLogs((prev) => (append ? [...prev, ...payload.logs] : payload.logs));
       setLogsHasMore(payload.hasMore);
@@ -952,6 +957,12 @@ export default function TeamManagePanel({
       setLogsLoading(false);
     };
     const doEmit = () => {
+      if (sessionAtFetch !== logSessionRef.current) {
+        logsLoadingRef.current = false;
+        setLogsLoading(false);
+        clearTimeout(timeout);
+        return;
+      }
       const logCategory = logSourceTab === "score" ? "score" : "shop";
       const shopItemId =
         logSourceTab === "shop" && shopLogItemFilter
@@ -961,26 +972,36 @@ export default function TeamManagePanel({
         "admin:requestLogs",
         { page, logCategory, shopItemId },
         (response: unknown) => {
-        if (response && typeof response === "object" && "logs" in response) {
-          handleLogs(
-            response as {
-              logs: ScoreChangeLogEntry[];
-              hasMore: boolean;
-              page: number;
-            },
-          );
-        } else {
-          logsLoadingRef.current = false;
-          setLogsLoading(false);
-          clearTimeout(timeout);
-        }
+          if (sessionAtFetch !== logSessionRef.current) {
+            logsLoadingRef.current = false;
+            setLogsLoading(false);
+            clearTimeout(timeout);
+            return;
+          }
+          if (response && typeof response === "object" && "logs" in response) {
+            handleLogs(
+              response as {
+                logs: ScoreChangeLogEntry[];
+                hasMore: boolean;
+                page: number;
+              },
+            );
+          } else {
+            logsLoadingRef.current = false;
+            setLogsLoading(false);
+            clearTimeout(timeout);
+          }
         },
       );
     };
     if (socket.connected) {
       doEmit();
     } else {
-      socket.once("connect", doEmit);
+      const onConnect = () => {
+        socket.off("connect", onConnect);
+        doEmit();
+      };
+      socket.on("connect", onConnect);
     }
   }, [logSourceTab, shopLogItemFilter]);
 
@@ -1011,6 +1032,8 @@ export default function TeamManagePanel({
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (view === "showLog") {
+      logSessionRef.current += 1;
+      logsLoadingRef.current = false;
       setLogs([]);
       setLogsPage(0);
       setLogsHasMore(true);
