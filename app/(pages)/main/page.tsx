@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { keyframes } from "@emotion/react";
 import styled from "@emotion/styled";
 import { getCurrentUser } from "@/data/currentUser";
@@ -13,7 +13,11 @@ import GameClock from "./components/GameClock";
 import ScoreCard from "./components/ScoreCard";
 import { getSocket } from "@/app/socketClient";
 import ShopCard from "./components/ShopCard";
-import type { ShopItemRecord } from "@/data/shopItems";
+import { CUPRAMEN_INITIAL_STOCK, type ShopItemRecord } from "@/data/shopItems";
+import {
+  pickRandomShopItemsFromRecords,
+  type ShopItemData,
+} from "./components/shopItems";
 
 const entranceFadeIn = keyframes`
   from { opacity: 0; }
@@ -170,6 +174,9 @@ export default function MainPage() {
   const [shopModalOpen, setShopModalOpen] = useState(false);
   const [shopCatalog, setShopCatalog] = useState<ShopItemRecord[] | null>(null);
   const [shopCatalogError, setShopCatalogError] = useState(false);
+  const [cupramenRemaining, setCupramenRemaining] = useState(
+    CUPRAMEN_INITIAL_STOCK,
+  );
   const [teamScore, setTeamScore] = useState(0);
   const [pendingTeamScore, setPendingTeamScore] = useState<number | null>(null);
 
@@ -212,6 +219,11 @@ export default function MainPage() {
       setShopCatalogError(true);
     }
   }, []);
+
+  const shopDisplayItems = useMemo((): ShopItemData[] | null => {
+    if (shopCatalog === null) return null;
+    return pickRandomShopItemsFromRecords(shopCatalog);
+  }, [shopCatalog]);
 
   useEffect(() => {
     setMounted(true);
@@ -263,6 +275,28 @@ export default function MainPage() {
       socket.off("connect", onConnect);
     };
   }, [mounted, loadShopCatalog]);
+
+  useEffect(() => {
+    if (!mounted) return;
+    const socket = getSocket();
+    const onLimited = (p: { cupramen?: number }) => {
+      if (p && typeof p.cupramen === "number") {
+        setCupramenRemaining(p.cupramen);
+      }
+    };
+    const requestStock = () => {
+      if (socket.connected) {
+        socket.emit("shop:requestLimitedStock");
+      }
+    };
+    socket.on("shop:limitedStock", onLimited);
+    socket.on("connect", requestStock);
+    requestStock();
+    return () => {
+      socket.off("shop:limitedStock", onLimited);
+      socket.off("connect", requestStock);
+    };
+  }, [mounted]);
 
   useEffect(() => {
     if (!mounted || !hasUnreadLetter || letterDismissed) return;
@@ -344,6 +378,8 @@ export default function MainPage() {
         onClose={() => setShopModalOpen(false)}
         catalogRecords={shopCatalog}
         catalogError={shopCatalogError}
+        displayItems={shopDisplayItems}
+        cupramenRemaining={cupramenRemaining}
       />
       <div
         className={`hide-until-hydrated ${mounted ? "mounted" : ""}`}

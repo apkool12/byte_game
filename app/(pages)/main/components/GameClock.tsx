@@ -79,6 +79,7 @@ export default function GameClock() {
   const [remainingMs, setRemainingMs] = useState(10 * 60 * 1000);
   const timerStartAtRef = useRef<number | null>(null);
   const timerDurationMsRef = useRef(10 * 60 * 1000);
+  const wallDeadlineRef = useRef<number | null>(null);
 
   useEffect(() => {
     const socket = getSocket();
@@ -87,7 +88,17 @@ export default function GameClock() {
       startedAt?: number | null;
       durationMs?: number;
       remainingMs?: number;
+      nextWallRefreshAt?: number;
     }) => {
+      if (typeof payload?.nextWallRefreshAt === "number") {
+        wallDeadlineRef.current = payload.nextWallRefreshAt;
+        timerStartAtRef.current = null;
+        setRemainingMs(
+          Math.max(0, payload.nextWallRefreshAt - Date.now()),
+        );
+        return;
+      }
+      wallDeadlineRef.current = null;
       const isRunning = payload?.running === true;
       if (!isRunning) {
         timerStartAtRef.current = null;
@@ -134,6 +145,11 @@ export default function GameClock() {
     }
 
     const id = setInterval(() => {
+      const wall = wallDeadlineRef.current;
+      if (wall != null) {
+        setRemainingMs(Math.max(0, wall - Date.now()));
+        return;
+      }
       const startAt = timerStartAtRef.current;
       if (startAt == null) return;
       const next = Math.max(

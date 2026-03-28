@@ -1,9 +1,6 @@
 import type { ReactNode } from "react";
 import type { ShopItemRecord } from "@/data/shopItems";
-import {
-  SHOP_DISPLAY_COUNT,
-  TOILET_ITEM_ID as DATA_TOILET_ID,
-} from "@/data/shopItems";
+import { SHOP_DISPLAY_COUNT } from "@/data/shopItems";
 
 export interface ShopItemData {
   id: string;
@@ -11,9 +8,6 @@ export interface ShopItemData {
   price: number;
   icon: ReactNode;
 }
-
-/** 화장실 아이템 id — 항상 첫 번째로 고정 */
-export const TOILET_ITEM_ID = DATA_TOILET_ID;
 
 const iconStyle = { width: 38, height: 38, objectFit: "contain" as const };
 
@@ -45,7 +39,7 @@ function shuffleArray<T>(arr: T[]): T[] {
 }
 
 /**
- * 화장실을 항상 첫 번째로 두고, 나머지는 풀에서 랜덤 선택.
+ * 카탈로그 풀에서 무작위로 SHOP_DISPLAY_COUNT개 노출.
  * records 가 비어 있으면 빈 배열.
  */
 export function pickRandomShopItemsFromRecords(
@@ -53,15 +47,5 @@ export function pickRandomShopItemsFromRecords(
 ): ShopItemData[] {
   const items = recordsToShopItemData(records);
   if (items.length === 0) return [];
-
-  const toilet = items.find((item) => item.id === TOILET_ITEM_ID);
-  const others = items.filter((item) => item.id !== TOILET_ITEM_ID);
-
-  if (!toilet) {
-    return shuffleArray(items).slice(0, SHOP_DISPLAY_COUNT);
-  }
-
-  const shuffled = shuffleArray(others);
-  const rest = shuffled.slice(0, SHOP_DISPLAY_COUNT - 1);
-  return [toilet, ...rest];
+  return shuffleArray(items).slice(0, SHOP_DISPLAY_COUNT);
 }

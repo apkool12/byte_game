@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { type ShopItemRecord, TOILET_ITEM_ID } from "@/data/shopItems";
+import { type ShopItemRecord } from "@/data/shopItems";
 import {
   ARIA_REMOVE_SHOP_ITEM,
   BTN_ADD_SHOP_ITEM,
@@ -283,7 +283,6 @@ export default function ShopManagePanel() {
   );
 
   const removeRow = useCallback((id: string) => {
-    if (id === TOILET_ITEM_ID) return;
     setItems((prev) => prev.filter((row) => row.id !== id));
   }, []);
 
@@ -365,12 +364,6 @@ export default function ShopManagePanel() {
               <RemoveBtn
                 type="button"
                 aria-label={ARIA_REMOVE_SHOP_ITEM}
-                disabled={row.id === TOILET_ITEM_ID}
-                title={
-                  row.id === TOILET_ITEM_ID
-                    ? "화장실 항목은 삭제할 수 없습니다"
-                    : undefined
-                }
                 onClick={() => setDeleteTarget(row)}
               >
                 ×

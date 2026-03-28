@@ -1,7 +1,15 @@
 import "server-only";
 
 import type { ShopItemRecord } from "@/data/shopItems";
-import { DEFAULT_SHOP_CATALOG_RECORDS } from "@/data/shopItems";
+import {
+  DEFAULT_SHOP_CATALOG_RECORDS,
+  EXCLUDED_SHOP_ITEM_IDS,
+} from "@/data/shopItems";
+
+function filterExcludedCatalogItems(items: ShopItemRecord[]): ShopItemRecord[] {
+  const banned = new Set<string>(EXCLUDED_SHOP_ITEM_IDS);
+  return items.filter((r) => !banned.has(r.id));
+}
 import { getPrisma } from "@/lib/prisma";
 
 export function normalizeShopItemInput(raw: unknown): ShopItemRecord | null {
@@ -43,14 +51,18 @@ export async function getShopCatalog(): Promise<ShopItemRecord[]> {
   });
   // 배포 직후·마이그레이션만 하고 시드를 안 돌린 경우 shop_items 가 비어 있음 → 상점이 텅 빈 것처럼 보임
   if (rows.length === 0) {
-    return DEFAULT_SHOP_CATALOG_RECORDS.map((r) => ({ ...r }));
+    return filterExcludedCatalogItems(
+      DEFAULT_SHOP_CATALOG_RECORDS.map((r) => ({ ...r })),
+    );
   }
-  return rows.map((r) => ({
-    id: r.id,
-    name: r.name,
-    price: r.price,
-    iconSrc: r.iconSrc,
-  }));
+  return filterExcludedCatalogItems(
+    rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      price: r.price,
+      iconSrc: r.iconSrc,
+    })),
+  );
 }
 
 export async function replaceShopCatalog(

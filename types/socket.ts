@@ -5,6 +5,11 @@ export interface ScoreChangeLogEntry {
   delta: number;
   processorName: string;
   timestamp: number;
+  /** 없으면 점수 조작 로그로 간주 */
+  logCategory?: "score" | "shop";
+  itemId?: string;
+  itemName?: string;
+  buyerName?: string;
 }
 
 /**

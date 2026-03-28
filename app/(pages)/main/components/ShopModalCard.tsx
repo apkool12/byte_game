@@ -3,12 +3,18 @@
 import { useMemo, useState } from "react";
 import { APP_NAME_ALT } from "@/data/app";
 import { getCurrentUser } from "@/data/currentUser";
+import { CUPRAMEN_ITEM_ID } from "@/data/shopItems";
 import {
   ARIA_CLOSE,
   CONFIRM_BUY,
   CONFIRM_CANCEL,
   CONFIRM_OK,
   POINT_SUFFIX,
+  SHOP_BUY_FAIL,
+  SHOP_BUY_INSUFFICIENT,
+  SHOP_BUY_SOLD_OUT,
+  SHOP_CUPRAMEN_REMAINING,
+  SHOP_SOLD_OUT,
 } from "@/data/copy";
 import styled from "@emotion/styled";
 import { keyframes } from "@emotion/react";
@@ -117,14 +123,15 @@ const ItemList = styled.ul`
   gap: 16px;
 `;
 
-const ItemRow = styled.li`
+const ItemRow = styled.li<{ $soldOut?: boolean }>`
   display: flex;
   align-items: center;
   gap: 0;
-  cursor: pointer;
+  cursor: ${({ $soldOut }) => ($soldOut ? "not-allowed" : "pointer")};
   transition: opacity 0.2s ease;
+  opacity: ${({ $soldOut }) => ($soldOut ? 0.48 : 1)};
   &:active {
-    opacity: 0.9;
+    opacity: ${({ $soldOut }) => ($soldOut ? 0.48 : 0.9)};
   }
 `;
 
@@ -197,6 +204,13 @@ const ItemPrice = styled.span`
   line-height: 132%;
   letter-spacing: -0.5px;
   opacity: 0.95;
+`;
+
+const ItemStockHint = styled.span`
+  color: rgba(255, 255, 255, 0.72);
+  font-family: var(--font-pretendard-light), sans-serif;
+  font-size: 12px;
+  line-height: 130%;
 `;
 
 const ConfirmOverlay = styled.div`
@@ -277,6 +291,13 @@ export interface ShopModalCardProps {
   items: ShopItemData[] | null;
   /** 로딩·에러 안내 (있으면 목록 대신 또는 함께 표시) */
   statusMessage?: string | null;
+  cupramenRemaining: number;
+}
+
+function buyFailMessage(reason: string | undefined): string {
+  if (reason === "sold_out") return SHOP_BUY_SOLD_OUT;
+  if (reason === "insufficient_points") return SHOP_BUY_INSUFFICIENT;
+  return SHOP_BUY_FAIL;
 }
 
 export default function ShopModalCard({
@@ -284,6 +305,7 @@ export default function ShopModalCard({
   onClose,
   items,
   statusMessage = null,
+  cupramenRemaining,
 }: ShopModalCardProps) {
   const listItems = useMemo(() => items ?? [], [items]);
   const [confirmingItem, setConfirmingItem] = useState<ShopItemData | null>(
@@ -305,30 +327,47 @@ export default function ShopModalCard({
         {statusMessage ? <StatusText>{statusMessage}</StatusText> : null}
         {listItems.length > 0 ? (
           <ItemList>
-            {listItems.map((item) => (
-              <ItemRow
-                key={item.id}
-                onClick={() => setConfirmingItem(item)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) =>
-                  e.key === "Enter" && setConfirmingItem(item)
-                }
-              >
-                <IconCircleOuter>
-                  <IconCircle>
-                    <IconWrap>{item.icon}</IconWrap>
-                  </IconCircle>
-                </IconCircleOuter>
-                <ItemStrip>
-                  <ItemName>{item.name}</ItemName>
-                  <ItemPrice>
-                    {item.price}
-                    {POINT_SUFFIX}
-                  </ItemPrice>
-                </ItemStrip>
-              </ItemRow>
-            ))}
+            {listItems.map((item) => {
+              const isCupramen = item.id === CUPRAMEN_ITEM_ID;
+              const soldOut = isCupramen && cupramenRemaining <= 0;
+              return (
+                <ItemRow
+                  key={item.id}
+                  $soldOut={soldOut}
+                  onClick={() => {
+                    if (soldOut) return;
+                    setConfirmingItem(item);
+                  }}
+                  role="button"
+                  tabIndex={soldOut ? -1 : 0}
+                  aria-disabled={soldOut}
+                  onKeyDown={(e) => {
+                    if (soldOut) return;
+                    if (e.key === "Enter") setConfirmingItem(item);
+                  }}
+                >
+                  <IconCircleOuter>
+                    <IconCircle>
+                      <IconWrap>{item.icon}</IconWrap>
+                    </IconCircle>
+                  </IconCircleOuter>
+                  <ItemStrip>
+                    <ItemName>{item.name}</ItemName>
+                    {isCupramen ? (
+                      <ItemStockHint>
+                        {soldOut
+                          ? SHOP_SOLD_OUT
+                          : SHOP_CUPRAMEN_REMAINING(cupramenRemaining)}
+                      </ItemStockHint>
+                    ) : null}
+                    <ItemPrice>
+                      {item.price}
+                      {POINT_SUFFIX}
+                    </ItemPrice>
+                  </ItemStrip>
+                </ItemRow>
+              );
+            })}
           </ItemList>
         ) : null}
       </BoxInner>
@@ -350,21 +389,41 @@ export default function ShopModalCard({
                 $primary
                 type="button"
                 onClick={() => {
-                  setConfirmingItem(null);
-                  if (currentUser) {
-                    // 소켓 서버로 구매 이벤트 전송 (실시간 동기화용)
-                    try {
-                      const socket = getSocket();
-                      socket.emit("team:buyItem", {
+                  if (!currentUser || !confirmingItem) return;
+                  if (
+                    confirmingItem.id === CUPRAMEN_ITEM_ID &&
+                    cupramenRemaining <= 0
+                  ) {
+                    alert(SHOP_BUY_SOLD_OUT);
+                    return;
+                  }
+                  try {
+                    const socket = getSocket();
+                    socket.emit(
+                      "team:buyItem",
+                      {
                         teamId: currentUser.teamId,
                         itemId: confirmingItem.id,
                         price: confirmingItem.price,
-                      });
-                    } catch {
-                      // 소켓 연결 실패 시에는 조용히 실패
-                    }
+                        buyerName: currentUser.name,
+                      },
+                      (
+                        res:
+                          | { ok?: boolean; reason?: string }
+                          | undefined
+                          | null,
+                      ) => {
+                        if (res?.ok) {
+                          setConfirmingItem(null);
+                          onClose();
+                          return;
+                        }
+                        alert(buyFailMessage(res?.reason));
+                      },
+                    );
+                  } catch {
+                    alert(SHOP_BUY_FAIL);
                   }
-                  onClose();
                 }}
               >
                 {CONFIRM_OK}

@@ -56,6 +56,11 @@ export const CONFIRM_CANCEL = "CANCEL";
 export const CONFIRM_OK = "CONFIRM";
 export const ARIA_SHOP = "상점";
 export const ARIA_SHOP_OPEN = "상점 열기";
+export const SHOP_CUPRAMEN_REMAINING = (n: number) => `남은 ${n}개`;
+export const SHOP_SOLD_OUT = "품절";
+export const SHOP_BUY_FAIL = "구매에 실패했습니다. 다시 시도해 주세요.";
+export const SHOP_BUY_SOLD_OUT = "품절된 상품입니다.";
+export const SHOP_BUY_INSUFFICIENT = "점수가 부족합니다.";
 
 /** 조별 관리 패널 */
 export const TEAM_MANAGE_TITLE = "조 관리";
@@ -64,7 +69,14 @@ export const TEAM_BTN_GAME = "GAME";
 export const SHOW_LOG_SHOW = "SHOW ";
 export const SHOW_LOG_LOG = "LOG";
 export const SHOW_LOG_TITLE = "SHOW LOG";
+export const LOG_TAB_SCORE_ADJUST = "점수조작";
+export const LOG_TAB_SHOP = "상점";
+export const LOG_SHOP_ITEM_FILTER_ALL = "전체 상품";
+export const LABEL_LOG_SHOP_ITEM_FILTER = "상품 필터";
+export const LOG_EMPTY_SCORE = "점수 조작 이력이 없습니다.";
+export const LOG_EMPTY_SHOP = "상점 구매 이력이 없습니다.";
 export const LOG_PROCESSOR_LABEL = "처리자";
+export const LOG_BUYER_LABEL = "구매자";
 export const GAME_RANK_TITLE = "순위 점수 조정";
 export const GAME_RANK_APPLY = "적용";
 export const GAME_ALL_VIEW = "전체";
@@ -88,7 +100,7 @@ export const LABEL_ADMIN_GAME_TYPE = "진행 게임";
 export const BTN_ADMIN_GAME_SAVE = "저장";
 export const BTN_ADMIN_GAME_TIMER_START = "타이머 시작";
 export const ADMIN_GAME_SAVE_DONE = "저장되었습니다.";
-export const ADMIN_GAME_TIMER_STARTED = "10분 타이머가 초기화되었습니다.";
+export const ADMIN_GAME_TIMER_STARTED = "상점 목록을 지금 새로고침했습니다.";
 export const ADMIN_GAME_TIMER_START_FAIL =
   "타이머 시작에 실패했습니다. 소켓 연결을 확인해 주세요.";
 export const ARIA_ADMIN_GAME_DEC = "한 단계 감소";

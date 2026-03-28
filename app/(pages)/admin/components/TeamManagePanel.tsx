@@ -7,7 +7,14 @@ import {
   SHOW_LOG_SHOW,
   SHOW_LOG_LOG,
   SHOW_LOG_TITLE,
+  LOG_TAB_SCORE_ADJUST,
+  LOG_TAB_SHOP,
+  LOG_SHOP_ITEM_FILTER_ALL,
+  LABEL_LOG_SHOP_ITEM_FILTER,
+  LOG_EMPTY_SCORE,
+  LOG_EMPTY_SHOP,
   LOG_PROCESSOR_LABEL,
+  LOG_BUYER_LABEL,
   GAME_RANK_TITLE,
   GAME_RANK_APPLY,
   GAME_ALL_VIEW,
@@ -749,6 +756,66 @@ const LogSentinel = styled.div`
   pointer-events: none;
 `;
 
+const LogTabBar = styled.div`
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  max-width: 320px;
+  margin-bottom: 12px;
+  box-sizing: border-box;
+`;
+
+const LogTabBtn = styled.button<{ $active?: boolean }>`
+  flex: 1;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-family: var(--font-pretendard-light), sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  background: ${({ $active }) =>
+    $active
+      ? "linear-gradient(90deg, #c41e50 0%, #f5376a 50%, #e88a9e 100%)"
+      : "linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 100%)"};
+  color: #fff;
+  opacity: ${({ $active }) => ($active ? 1 : 0.78)};
+`;
+
+const ShopLogFilterRow = styled.div`
+  width: 100%;
+  max-width: 320px;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-sizing: border-box;
+`;
+
+const ShopLogFilterLabel = styled.label`
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+  font-family: var(--font-pretendard-light), sans-serif;
+`;
+
+const ShopLogFilterSelect = styled.select`
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: #1a1a1a;
+  color: #fff;
+  font-size: 14px;
+  font-family: var(--font-pretendard-light), sans-serif;
+`;
+
+const LogEntrySub = styled.span`
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+  font-family: var(--font-pretendard-light), sans-serif;
+  line-height: 130%;
+`;
+
 export interface TeamManagePanelProps {
   onViewChange?: (view: "main" | "showLog") => void;
 }
@@ -775,6 +842,11 @@ export default function TeamManagePanel({
   const [logsPage, setLogsPage] = useState(0);
   const [logsHasMore, setLogsHasMore] = useState(true);
   const [logsLoading, setLogsLoading] = useState(false);
+  const [logSourceTab, setLogSourceTab] = useState<"score" | "shop">("score");
+  const [shopLogItemFilter, setShopLogItemFilter] = useState("");
+  const [shopLogFilterOptions, setShopLogFilterOptions] = useState<
+    { id: string; name: string }[]
+  >([]);
   const [rankTeamByPlace, setRankTeamByPlace] = useState<number[]>(
     Array.from({ length: 10 }, (_, idx) => idx + 1),
   );
@@ -880,7 +952,15 @@ export default function TeamManagePanel({
       setLogsLoading(false);
     };
     const doEmit = () => {
-      socket.emit("admin:requestLogs", { page }, (response: unknown) => {
+      const logCategory = logSourceTab === "score" ? "score" : "shop";
+      const shopItemId =
+        logSourceTab === "shop" && shopLogItemFilter
+          ? shopLogItemFilter
+          : undefined;
+      socket.emit(
+        "admin:requestLogs",
+        { page, logCategory, shopItemId },
+        (response: unknown) => {
         if (response && typeof response === "object" && "logs" in response) {
           handleLogs(
             response as {
@@ -894,15 +974,41 @@ export default function TeamManagePanel({
           setLogsLoading(false);
           clearTimeout(timeout);
         }
-      });
+        },
+      );
     };
     if (socket.connected) {
       doEmit();
     } else {
       socket.once("connect", doEmit);
     }
-  }, []);
+  }, [logSourceTab, shopLogItemFilter]);
 
+  useEffect(() => {
+    if (view !== "showLog" || logSourceTab !== "shop") return;
+    let cancelled = false;
+    fetch("/api/shop/catalog")
+      .then((r) => r.json())
+      .then((d: { items?: unknown }) => {
+        if (cancelled || !Array.isArray(d.items)) return;
+        const opts: { id: string; name: string }[] = [];
+        for (const row of d.items) {
+          if (!row || typeof row !== "object") continue;
+          const o = row as Record<string, unknown>;
+          const id = typeof o.id === "string" ? o.id : "";
+          const name = typeof o.name === "string" ? o.name : "";
+          if (id) opts.push({ id, name: name || id });
+        }
+        setShopLogFilterOptions(opts);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [view, logSourceTab]);
+
+  /* SHOW LOG 진입·탭·상품 필터 변경 시 서버에서 첫 페이지부터 다시 받기 */
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (view === "showLog") {
       setLogs([]);
@@ -911,7 +1017,8 @@ export default function TeamManagePanel({
       lastFetchedPageRef.current = 0;
       fetchLogs(0, false);
     }
-  }, [view, fetchLogs]);
+  }, [view, logSourceTab, shopLogItemFilter, fetchLogs]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
     if (view !== "showLog" || !logsHasMore || logsLoading) return;
@@ -931,7 +1038,7 @@ export default function TeamManagePanel({
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [view, logsHasMore, logsLoading, fetchLogs]);
+  }, [view, logsHasMore, logsLoading, fetchLogs, logSourceTab, shopLogItemFilter]);
 
   const formatLogTime = useCallback((ts: number) => {
     const d = new Date(ts);
@@ -1118,12 +1225,54 @@ export default function TeamManagePanel({
   if (view === "showLog") {
     return (
       <ShowLogFullWidth>
+        <LogTabBar role="tablist" aria-label={SHOW_LOG_TITLE}>
+          <LogTabBtn
+            type="button"
+            role="tab"
+            aria-selected={logSourceTab === "score"}
+            $active={logSourceTab === "score"}
+            onClick={() => setLogSourceTab("score")}
+          >
+            {LOG_TAB_SCORE_ADJUST}
+          </LogTabBtn>
+          <LogTabBtn
+            type="button"
+            role="tab"
+            aria-selected={logSourceTab === "shop"}
+            $active={logSourceTab === "shop"}
+            onClick={() => setLogSourceTab("shop")}
+          >
+            {LOG_TAB_SHOP}
+          </LogTabBtn>
+        </LogTabBar>
+        {logSourceTab === "shop" ? (
+          <ShopLogFilterRow>
+            <ShopLogFilterLabel htmlFor="shop-log-item-filter">
+              {LABEL_LOG_SHOP_ITEM_FILTER}
+            </ShopLogFilterLabel>
+            <ShopLogFilterSelect
+              id="shop-log-item-filter"
+              aria-label={LABEL_LOG_SHOP_ITEM_FILTER}
+              value={shopLogItemFilter}
+              onChange={(e) => setShopLogItemFilter(e.target.value)}
+            >
+              <option value="">{LOG_SHOP_ITEM_FILTER_ALL}</option>
+              {shopLogFilterOptions.map((opt) => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.name}
+                </option>
+              ))}
+            </ShopLogFilterSelect>
+          </ShopLogFilterRow>
+        ) : null}
         <LogScrollWrap ref={logScrollRef}>
           {logs.length === 0 ? (
             logsLoading ? (
               <LogLoading>로딩 중...</LogLoading>
             ) : (
-              <LogEmpty>점수 변경 이력이 없습니다.</LogEmpty>
+              <LogEmpty>
+                {logSourceTab === "score" ? LOG_EMPTY_SCORE : LOG_EMPTY_SHOP}
+              </LogEmpty>
             )
           ) : (
             logs.map((entry, idx) => (
@@ -1133,11 +1282,22 @@ export default function TeamManagePanel({
                     {entry.teamName}{" "}
                     {entry.delta >= 0 ? `+${entry.delta}` : entry.delta}
                   </LogEntryScoreText>
+                  {entry.logCategory === "shop" && entry.itemName ? (
+                    <LogEntrySub>{entry.itemName}</LogEntrySub>
+                  ) : null}
                   <LogEntryTime>{formatLogTime(entry.timestamp)}</LogEntryTime>
                 </LogEntryLeft>
                 <LogEntryRight>
-                  <LogProcessorLabel>{LOG_PROCESSOR_LABEL}</LogProcessorLabel>
-                  <LogProcessorName>{entry.processorName}</LogProcessorName>
+                  <LogProcessorLabel>
+                    {entry.logCategory === "shop"
+                      ? LOG_BUYER_LABEL
+                      : LOG_PROCESSOR_LABEL}
+                  </LogProcessorLabel>
+                  <LogProcessorName>
+                    {entry.logCategory === "shop"
+                      ? (entry.buyerName ?? "—")
+                      : entry.processorName}
+                  </LogProcessorName>
                 </LogEntryRight>
               </LogEntryCard>
             ))

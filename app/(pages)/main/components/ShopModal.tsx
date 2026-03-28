@@ -11,10 +11,7 @@ import type { ShopItemRecord } from "@/data/shopItems";
 import styled from "@emotion/styled";
 import { keyframes } from "@emotion/react";
 import ShopModalCard from "./ShopModalCard";
-import {
-  pickRandomShopItemsFromRecords,
-  type ShopItemData,
-} from "./shopItems";
+import type { ShopItemData } from "./shopItems";
 
 const overlayFadeIn = keyframes`
   from { opacity: 0; }
@@ -57,6 +54,9 @@ export interface ShopModalProps {
   /** null = 로딩 중, [] = 비어 있음 또는 실패 후 빈 목록 */
   catalogRecords: ShopItemRecord[] | null;
   catalogError?: boolean;
+  /** 벽시계 10분 주기까지 유지되는 노출 슬롯 (부모에서 catalog 변경 시에만 갱신) */
+  displayItems: ShopItemData[] | null;
+  cupramenRemaining: number;
 }
 
 export default function ShopModal({
@@ -64,27 +64,14 @@ export default function ShopModal({
   onClose,
   catalogRecords,
   catalogError = false,
+  displayItems,
+  cupramenRemaining,
 }: ShopModalProps) {
   const [isClosing, setIsClosing] = useState(false);
-  const [displayItems, setDisplayItems] = useState<ShopItemData[] | null>(
-    null,
-  );
 
   useEffect(() => {
     if (open) setIsClosing(false);
   }, [open]);
-
-  useEffect(() => {
-    if (!open) {
-      setDisplayItems(null);
-      return;
-    }
-    if (catalogRecords === null) {
-      setDisplayItems(null);
-      return;
-    }
-    setDisplayItems(pickRandomShopItemsFromRecords(catalogRecords));
-  }, [open, catalogRecords]);
 
   const statusMessage = useMemo(() => {
     if (catalogRecords === null && !catalogError) return SHOP_CATALOG_LOADING;
@@ -114,6 +101,7 @@ export default function ShopModal({
         onClose={handleClose}
         items={displayItems}
         statusMessage={statusMessage}
+        cupramenRemaining={cupramenRemaining}
       />
     </Overlay>
   );
