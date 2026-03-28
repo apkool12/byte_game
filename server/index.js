@@ -288,15 +288,24 @@ io.on("connection", (socket) => {
   });
 
   // 어드민 점수 증감 (delta: 양수=증가, 음수=차감)
-  socket.on("admin:adjustScore", (payload) => {
+  socket.on("admin:adjustScore", (payload, ack) => {
     try {
       const { teamId, delta: deltaRaw, processorName } = payload || {};
-      if (!teamId) return;
+      if (!teamId) {
+        if (typeof ack === "function") ack({ ok: false });
+        return;
+      }
       const delta = Number(deltaRaw);
-      if (Number.isNaN(delta)) return;
+      if (Number.isNaN(delta)) {
+        if (typeof ack === "function") ack({ ok: false });
+        return;
+      }
 
       const current = teamPoints[teamId];
-      if (current == null) return;
+      if (current == null) {
+        if (typeof ack === "function") ack({ ok: false });
+        return;
+      }
       const next = Math.min(MAX_TEAM_SCORE, Math.max(0, current + delta));
       teamPoints[teamId] = next;
 
@@ -310,8 +319,10 @@ io.on("connection", (socket) => {
       });
 
       io.emit("team:scoreUpdated", { teamId, points: next });
+      if (typeof ack === "function") ack({ ok: true });
     } catch (err) {
       console.error("admin:adjustScore error", err);
+      if (typeof ack === "function") ack({ ok: false });
     }
   });
 
@@ -359,23 +370,25 @@ io.on("connection", (socket) => {
     }
   });
 
-  // 점수 변경 로그 조회 (페이지네이션) — ack로 응답 보장
+  // 점수 변경 로그 조회 (페이지네이션) — ack + 이벤트 이중 전송(리버스 프록시 등에서 ack 유실 대비)
   socket.on("admin:requestLogs", (payload, ack) => {
     try {
       const { page = 0 } = payload || {};
+      const requestId = payload?.requestId;
       const filtered = filterLogsForRequest(payload);
       const start = page * LOG_PAGE_SIZE;
       const slice = filtered.slice(start, start + LOG_PAGE_SIZE);
       const hasMore = start + slice.length < filtered.length;
-      const response = { logs: slice, hasMore, page };
+      const response = { requestId, logs: slice, hasMore, page };
       if (typeof ack === "function") {
         ack(response);
-      } else {
-        socket.emit("admin:scoreLogs", response);
       }
+      socket.emit("admin:scoreLogs", response);
     } catch (err) {
       console.error("admin:requestLogs error", err);
-      if (typeof ack === "function") ack({ logs: [], hasMore: false, page: 0 });
+      const fallback = { logs: [], hasMore: false, page: 0 };
+      if (typeof ack === "function") ack(fallback);
+      socket.emit("admin:scoreLogs", fallback);
     }
   });
 });

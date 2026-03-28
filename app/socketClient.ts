@@ -26,23 +26,25 @@ export function getSocket(): Socket {
       }
       return options;
     };
-    const devLog = (...args: unknown[]) => {
-      if (process.env.NODE_ENV === "development") {
-        // eslint-disable-next-line no-console -- 로컬에서만 소켓 디버그
-        console.log(...args);
-      }
+    const statusLog = (...args: unknown[]) => {
+      // eslint-disable-next-line no-console -- 운영에서도 소켓 연결 상태 확인용
+      console.log(...args);
     };
     const connectSocket = (url: string) => {
-      devLog("[socket] 연결 확인 중...", url);
+      statusLog("[socket] 연결 시도:", url);
       socket = io(url, createOptions(url));
       socket.on("connect", () => {
-        devLog("[socket] 연결 확인: 연결됨", url);
+        statusLog("[socket] 연결됨:", {
+          url,
+          id: socket?.id,
+          transport: socket?.io.engine.transport.name,
+        });
       });
       socket.on("disconnect", (reason) => {
-        devLog("[socket] 연결 끊김", reason);
+        statusLog("[socket] 연결 끊김:", reason);
       });
       socket.on("connect_error", (err) => {
-        devLog("[socket] 연결 실패", err.message);
+        statusLog("[socket] 연결 실패:", err.message);
         const canFallback =
           isNgrokUrl(url) &&
           !didFallbackFromNgrok &&
@@ -51,7 +53,7 @@ export function getSocket(): Socket {
             window.location.hostname === "127.0.0.1");
         if (canFallback) {
           didFallbackFromNgrok = true;
-          devLog("[socket] ngrok 실패 → 운영 소켓 URL 폴백");
+          statusLog("[socket] ngrok 실패 → 운영 소켓 URL 폴백");
           socket?.removeAllListeners();
           socket?.disconnect();
           connectSocket(DEFAULT_PUBLIC_SOCKET_URL);

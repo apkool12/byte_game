@@ -931,15 +931,22 @@ export default function TeamManagePanel({
   const logsLoadingRef = useRef(false);
   /** 로그 뷰·탭·필터가 바뀌면 증가 — 직전 요청 응답은 무시 (빈 목록·로딩 멈춤 방지) */
   const logSessionRef = useRef(0);
+  /** 요청별 id — 서버가 echo 하며, admin:scoreLogs / ack 중복 수신 시 한 번만 반영 */
+  const logRequestSeqRef = useRef(0);
   const fetchLogs = useCallback((page: number, append: boolean) => {
     if (logsLoadingRef.current) return;
     logsLoadingRef.current = true;
     setLogsLoading(true);
     const socket = getSocket();
     const sessionAtFetch = logSessionRef.current;
+    const requestId = ++logRequestSeqRef.current;
+    let settled = false;
+    const finalizeListeners = () => {
+      socket.off("admin:scoreLogs");
+    };
     const timeout = setTimeout(() => {
-      if (sessionAtFetch !== logSessionRef.current) return;
-      if (logsLoadingRef.current) {
+      finalizeListeners();
+      if (sessionAtFetch === logSessionRef.current) {
         logsLoadingRef.current = false;
         setLogsLoading(false);
       }
@@ -949,18 +956,71 @@ export default function TeamManagePanel({
       hasMore: boolean;
       page: number;
     }) => {
-      if (sessionAtFetch !== logSessionRef.current) return;
+      if (sessionAtFetch !== logSessionRef.current) {
+        logsLoadingRef.current = false;
+        setLogsLoading(false);
+        return;
+      }
       clearTimeout(timeout);
       setLogs((prev) => (append ? [...prev, ...payload.logs] : payload.logs));
       setLogsHasMore(payload.hasMore);
       logsLoadingRef.current = false;
       setLogsLoading(false);
     };
+    function onScoreLogs(response: unknown) {
+      applyResponse(response);
+    }
+    const applyResponse = (response: unknown) => {
+      if (settled) return;
+      if (sessionAtFetch !== logSessionRef.current) {
+        settled = true;
+        finalizeListeners();
+        clearTimeout(timeout);
+        logsLoadingRef.current = false;
+        setLogsLoading(false);
+        return;
+      }
+      if (!response || typeof response !== "object" || !("logs" in response)) {
+        settled = true;
+        finalizeListeners();
+        clearTimeout(timeout);
+        logsLoadingRef.current = false;
+        setLogsLoading(false);
+        return;
+      }
+      const r = response as {
+        requestId?: number;
+        logs: ScoreChangeLogEntry[];
+        hasMore: boolean;
+        page: number;
+      };
+      const rid = r.requestId;
+      if (
+        rid !== undefined &&
+        rid !== null &&
+        Number(rid) !== Number(requestId)
+      ) {
+        return;
+      }
+      if (!Array.isArray(r.logs)) {
+        settled = true;
+        finalizeListeners();
+        clearTimeout(timeout);
+        logsLoadingRef.current = false;
+        setLogsLoading(false);
+        return;
+      }
+      settled = true;
+      finalizeListeners();
+      clearTimeout(timeout);
+      handleLogs(r);
+    };
     const doEmit = () => {
       if (sessionAtFetch !== logSessionRef.current) {
         logsLoadingRef.current = false;
         setLogsLoading(false);
         clearTimeout(timeout);
+        finalizeListeners();
         return;
       }
       const logCategory = logSourceTab === "score" ? "score" : "shop";
@@ -968,29 +1028,13 @@ export default function TeamManagePanel({
         logSourceTab === "shop" && shopLogItemFilter
           ? shopLogItemFilter
           : undefined;
+      socket.off("admin:scoreLogs");
+      socket.on("admin:scoreLogs", onScoreLogs);
       socket.emit(
         "admin:requestLogs",
-        { page, logCategory, shopItemId },
+        { page, logCategory, shopItemId, requestId },
         (response: unknown) => {
-          if (sessionAtFetch !== logSessionRef.current) {
-            logsLoadingRef.current = false;
-            setLogsLoading(false);
-            clearTimeout(timeout);
-            return;
-          }
-          if (response && typeof response === "object" && "logs" in response) {
-            handleLogs(
-              response as {
-                logs: ScoreChangeLogEntry[];
-                hasMore: boolean;
-                page: number;
-              },
-            );
-          } else {
-            logsLoadingRef.current = false;
-            setLogsLoading(false);
-            clearTimeout(timeout);
-          }
+          applyResponse(response);
         },
       );
     };
@@ -1176,6 +1220,49 @@ export default function TeamManagePanel({
     [rankPenaltyByPlace],
   );
 
+  const emitAdminAdjustScore = useCallback(
+    (teamId: string, delta: number) => {
+      const socket = getSocket();
+      const payload = {
+        teamId,
+        delta,
+        processorName: getCurrentUser()?.name ?? "알 수 없음",
+      };
+      const doEmit = () => {
+        let done = false;
+        const timeout = window.setTimeout(() => {
+          if (done) return;
+          done = true;
+          // eslint-disable-next-line no-alert
+          alert("점수 적용 응답이 지연됩니다. 서버 연결 상태를 확인해 주세요.");
+        }, 4500);
+        socket.emit(
+          "admin:adjustScore",
+          payload,
+          (response: { ok?: boolean } | undefined) => {
+            if (done) return;
+            done = true;
+            window.clearTimeout(timeout);
+            if (!response?.ok) {
+              // eslint-disable-next-line no-alert
+              alert("점수 적용에 실패했습니다. 서버 상태를 확인해 주세요.");
+            }
+          },
+        );
+      };
+      if (socket.connected) {
+        doEmit();
+      } else {
+        const onConnect = () => {
+          socket.off("connect", onConnect);
+          doEmit();
+        };
+        socket.on("connect", onConnect);
+      }
+    },
+    [],
+  );
+
   const applyRankPenalty = useCallback(() => {
     const scoreDeltaByTeam = new Map<string, number>();
     const optionByTeamNumber = new Map(
@@ -1196,16 +1283,11 @@ export default function TeamManagePanel({
       return;
     }
 
-    const socket = getSocket();
     scoreDeltaByTeam.forEach((delta, teamKey) => {
-      socket.emit("admin:adjustScore", {
-        teamId: teamKey,
-        delta,
-        processorName: getCurrentUser()?.name ?? "알 수 없음",
-      });
+      emitAdminAdjustScore(teamKey, delta);
     });
     setView("gameManage");
-  }, [rankTeamOptions, getPenaltyByPlace, rankTeamByPlace]);
+  }, [rankTeamOptions, getPenaltyByPlace, rankTeamByPlace, emitAdminAdjustScore]);
 
   const applyAllPenalty = useCallback(() => {
     if (allAdjustAmount <= 0) {
@@ -1381,16 +1463,7 @@ export default function TeamManagePanel({
             onConfirm={(delta) => {
               const numDelta = Number(delta);
               if (!Number.isNaN(numDelta) && numDelta !== 0) {
-                try {
-                  const socket = getSocket();
-                  socket.emit("admin:adjustScore", {
-                    teamId,
-                    delta: numDelta,
-                    processorName: getCurrentUser()?.name ?? "알 수 없음",
-                  });
-                } catch {
-                  // 소켓 미연결 시 조용히 무시
-                }
+                emitAdminAdjustScore(teamId, numDelta);
               }
             }}
           />
